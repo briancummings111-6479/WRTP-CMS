@@ -1,0 +1,5 @@
+{
+  "name": "WRTP-CMS",
+  "description": "A secure, compliant, and cloud-native Case Management System (CMS) for the CHYBA-WRTP. The system centralizes client data, streamlines service tracking, and provides WIOA-compliant outcome metrics for a small user base.",
+  "requestFramePermissions": []
+}
