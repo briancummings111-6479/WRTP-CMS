@@ -47,7 +47,8 @@ const ClientDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('Case Notes');
 
-  const tabs = ['Case Notes', 'ISP', 'Files'];
+  // Updated tabs array with new name
+  const tabs = ['Case Notes', 'ISP', 'Onboarding Documents', 'Training', 'Files'];
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -105,6 +106,7 @@ const ClientDashboardPage: React.FC = () => {
   const { profile, contactInfo, metadata } = client;
 
   const calculateAge = (dobString: string): number => {
+    if (!dobString) return 0; // Handle missing DOB
     // Split to avoid timezone issues with `new Date(string)`
     const [year, month, day] = dobString.split('-').map(Number);
     const dob = new Date(year, month - 1, day);
@@ -150,11 +152,13 @@ const ClientDashboardPage: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center text-gray-700">
                 <User className="h-5 w-5 mr-3 text-gray-400" /> 
-                <span>Age {clientAge} (DOB: {profile.dob})</span>
+                <span>
+                  {clientAge > 0 ? `Age ${clientAge} (DOB: ${profile.dob})` : (profile.dob ? `DOB: ${profile.dob}` : 'DOB not set')}
+                </span>
               </div>
               <div className="flex items-center text-gray-700">
                 <Phone className="h-5 w-5 mr-3 text-gray-400" /> 
-                <span>{contactInfo.phone}</span>
+                <span>{contactInfo.phone || 'No phone'}</span>
               </div>
               {contactInfo.phone2 && (
                 <div className="flex items-center text-gray-700">
@@ -164,11 +168,11 @@ const ClientDashboardPage: React.FC = () => {
               )}
               <div className="flex items-center text-gray-700">
                 <Mail className="h-5 w-5 mr-3 text-gray-400" /> 
-                <span>{contactInfo.email}</span>
+                <span>{contactInfo.email || 'No email'}</span>
               </div>
                <div className="flex items-start text-gray-700">
                 <Home className="h-5 w-5 mr-3 text-gray-400 flex-shrink-0 mt-1" /> 
-                <span>{contactInfo.street}{contactInfo.apt ? `, ${contactInfo.apt}` : ''}, {contactInfo.city}, {contactInfo.state} {contactInfo.zip}</span>
+                <span>{contactInfo.street ? `${contactInfo.street}${contactInfo.apt ? `, ${contactInfo.apt}` : ''}, ${contactInfo.city}, ${contactInfo.state} ${contactInfo.zip}` : 'No address'}</span>
               </div>
               {client.googleDriveLink && (
                   <div className="flex items-center text-gray-700">
@@ -180,29 +184,9 @@ const ClientDashboardPage: React.FC = () => {
               )}
             </div>
           </Card>
-          <Card title="Case Management Checklist">
-             <div className="space-y-3">
-                <ChecklistItem label="Application Packet" checked={client.caseManagement.applicationPacket} />
-                <ChecklistItem label="ID" checked={client.caseManagement.id} />
-                <ChecklistItem label="Proof of Income" checked={client.caseManagement.proofOfIncome} />
-                <ChecklistItem label="Initial Assessment" checked={client.caseManagement.initialAssessment} />
-                <ChecklistItem label="ROI" checked={client.caseManagement.roi} />
-                <ChecklistItem label="ISP Completed" checked={client.caseManagement.ispCompleted} />
-            </div>
-          </Card>
-          <Card title="Training & Certifications">
-             <div className="space-y-3">
-                <ChecklistItem label="CPR" checked={client.training.cpr} />
-                <ChecklistItem label="First Aid" checked={client.training.firstAid} />
-                <ChecklistItem label="Food Handlers Card" checked={client.training.foodHandlersCard} />
-                <hr/>
-                <ChecklistItem label="Construction CTE" checked={client.training.constructionCTE} />
-                <ChecklistItem label="Cosmetology CTE" checked={client.training.cosmetologyCTE} />
-                <ChecklistItem label="Culinary CTE" checked={client.training.culinaryCTE} />
-                <ChecklistItem label="Fire CTE" checked={client.training.fireCTE} />
-                <ChecklistItem label="Medical CTE" checked={client.training.medicalCTE} />
-            </div>
-          </Card>
+
+          {/* ----- Cards Removed From Here ----- */}
+          
            <TasksSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />
            <WorkshopsSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />
         </div>
@@ -211,7 +195,7 @@ const ClientDashboardPage: React.FC = () => {
         <div className="lg:col-span-2">
             <div className="bg-[#E6E6E6] rounded-lg shadow-md border border-[#d1d1d1]">
                  <div className="border-b border-[#d1d1d1]">
-                    <nav className="-mb-px flex space-x-6 px-6" aria-label="Tabs">
+                    <nav className="-mb-px flex space-x-6 px-6 overflow-x-auto" aria-label="Tabs">
                     {tabs.map(tab => (
                         <button 
                             key={tab} 
@@ -229,7 +213,35 @@ const ClientDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-6">
                     {activeTab === 'Case Notes' && <CaseNotesSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />}
+                    
                     {activeTab === 'ISP' && <ISPSection client={client} isp={isp} onIspUpdate={handleIspUpdate} />}
+                    
+                    {/* ----- Renamed tab logic ----- */}
+                    {activeTab === 'Onboarding Documents' && (
+                      <div className="space-y-3">
+                        <ChecklistItem label="Application Packet" checked={client.caseManagement.applicationPacket} />
+                        <ChecklistItem label="ID" checked={client.caseManagement.id} />
+                        <ChecklistItem label="Proof of Income" checked={client.caseManagement.proofOfIncome} />
+                        <ChecklistItem label="Initial Assessment" checked={client.caseManagement.initialAssessment} />
+                        <ChecklistItem label="ROI" checked={client.caseManagement.roi} />
+                        <ChecklistItem label="ISP Completed" checked={client.caseManagement.ispCompleted} />
+                      </div>
+                    )}
+                    {activeTab === 'Training' && (
+                      <div className="space-y-3">
+                        <ChecklistItem label="CPR" checked={client.training.cpr} />
+                        <ChecklistItem label="First Aid" checked={client.training.firstAid} />
+                        <ChecklistItem label="Food Handlers Card" checked={client.training.foodHandlersCard} />
+                        <hr className="my-2 border-gray-300"/>
+                        <ChecklistItem label="Construction CTE" checked={client.training.constructionCTE} />
+                        <ChecklistItem label="Cosmetology CTE" checked={client.training.cosmetologyCTE} />
+                        <ChecklistItem label="Culinary CTE" checked={client.training.culinaryCTE} />
+                        <ChecklistItem label="Fire CTE" checked={client.training.fireCTE} />
+                        <ChecklistItem label="Medical CTE" checked={client.training.medicalCTE} />
+                      </div>
+                    )}
+                    {/* ------------------------------------- */}
+
                     {activeTab === 'Files' && <AttachmentsSection clientId={client.id} />}
                 </div>
             </div>
