@@ -17,13 +17,13 @@ export interface Client {
   profile: {
     firstName: string;
     lastName: string;
-    dob: string; // YYYY-MM-DD
+    dob?: string; // YYYY-MM-DD
     age: number;
   };
   contactInfo: {
     phone: string;
     phone2?: string;
-    email: string;
+    email?: string;
     street: string;
     apt?: string;
     city: string;

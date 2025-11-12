@@ -69,16 +69,19 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
     const { user } = useAuth();
 
     useEffect(() => {
+        // Set a default admin if one isn't selected, but it's no longer required
         if (isOpen && admins.length > 0 && !formData.metadata.assignedAdminId) {
             setFormData((prev: any) => ({
                 ...prev,
                 metadata: {
                     ...prev.metadata,
-                    assignedAdminId: admins[0].id,
+                    // You might still want to default to the first admin or an "Unassigned" option
+                    assignedAdminId: admins[0].id, 
                     assignedAdminName: admins[0].name,
                 }
             }));
         }
+        // Reset form on close
         if (!isOpen) {
             setFormData(initialFormData);
         }
@@ -129,7 +132,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             onSave(newClient);
         } catch (error) {
             console.error("Failed to add client:", error);
-            alert("Failed to add client. Please try again.");
+            // Don't use alert() in production apps, but leaving as per original code
+            alert("Failed to add client. Please try again."); 
         } finally {
             setIsSaving(false);
         }
@@ -154,12 +158,14 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">First Name</label><input type="text" name="profile.firstName" value={formData.profile.firstName} onChange={handleInputChange} className="form-input" required /></div>
                                 <div><label className="label">Last Name</label><input type="text" name="profile.lastName" value={formData.profile.lastName} onChange={handleInputChange} className="form-input" required /></div>
-                                <div><label className="label">Date of Birth</label><input type="date" name="profile.dob" value={formData.profile.dob} onChange={handleInputChange} className="form-input" required /></div>
+                                {/* Removed 'required' from DOB */}
+                                <div><label className="label">Date of Birth</label><input type="date" name="profile.dob" value={formData.profile.dob} onChange={handleInputChange} className="form-input" /></div>
                             </div>
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">Phone</label><input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone} onChange={handleInputChange} className="form-input" /></div>
                                 <div><label className="label">Second Phone</label><input type="tel" name="contactInfo.phone2" value={formData.contactInfo.phone2} onChange={handleInputChange} className="form-input" /></div>
-                                <div><label className="label">Email</label><input type="email" name="contactInfo.email" value={formData.contactInfo.email} onChange={handleInputChange} className="form-input" required /></div>
+                                {/* Removed 'required' from Email */}
+                                <div><label className="label">Email</label><input type="email" name="contactInfo.email" value={formData.contactInfo.email} onChange={handleInputChange} className="form-input" /></div>
                             </div>
                              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                 <div className="md:col-span-2"><label className="label">Street Address</label><input type="text" name="contactInfo.street" value={formData.contactInfo.street} onChange={handleInputChange} className="form-input" /></div>
@@ -180,7 +186,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">Client Status</label><select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input"><option value="Prospect">Prospect</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
-                                <div><label className="label">Assigned Case Manager</label><select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input" required><option value="" disabled>Select a manager</option>{admins.map(admin => (<option key={admin.id} value={admin.id}>{admin.name}</option>))}</select></div>
+                                {/* Removed 'required' from Assigned Case Manager */}
+                                <div><label className="label">Assigned Case Manager</label><select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input"><option value="">Unassigned</option>{admins.map(admin => (<option key={admin.id} value={admin.id}>{admin.name}</option>))}</select></div>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
                                 <CheckboxInput label="Application Packet" name="caseManagement.applicationPacket" checked={formData.caseManagement.applicationPacket} onChange={handleInputChange} />
