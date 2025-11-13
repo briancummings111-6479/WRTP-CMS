@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Client, AuditChecklist } from '../types'; // Import new type
+import { Client } from '../types';
 import { X } from 'lucide-react';
 import api from '../services/mockApi';
 import { useAuth } from '../context/AuthContext';
@@ -10,42 +10,6 @@ interface AddClientModalProps {
   onSave: (newClient: Client) => void;
   admins: { id: string, name: string }[];
 }
-
-// --- NEW Initial data for Audit Checklist ---
-const initialAuditChecklist: AuditChecklist = {
-  onboarding: [
-    { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  isp: [
-    { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  caseNotes: [
-    { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  workshops: [
-    { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  misc: [
-    // Per the CSV, this section is empty
-  ]
-};
-// ----------------------------------------
 
 const initialFormData = {
     profile: {
@@ -65,26 +29,23 @@ const initialFormData = {
     },
     referralSource: '',
     googleDriveLink: '',
-    
-    // --- REPLACED caseManagement ---
-    auditChecklist: initialAuditChecklist,
-    // -------------------------------
-
+    caseManagement: {
+        applicationPacket: false,
+        id: false,
+        proofOfIncome: false,
+        initialAssessment: false,
+        roi: false,
+        ispCompleted: false,
+    },
     training: {
         cpr: false,
         firstAid: false,
         foodHandlersCard: false,
-        osha10: false, // Added
-        nccer: false, // Added
-        otherCertificates: '',
         constructionCTE: false,
         cosmetologyCTE: false,
         culinaryCTE: false,
         fireCTE: false,
         medicalCTE: false,
-        earlyChildhoodEducationCTE: false, // Added
-        entrepreneurshipCTE: false, // Added
-        otherCteProgram: '',
     },
     metadata: {
         assignedAdminId: '',
@@ -114,9 +75,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                 ...prev,
                 metadata: {
                     ...prev.metadata,
-                    // Default to "Unassigned"
-                    assignedAdminId: '', 
-                    assignedAdminName: '',
+                    // You might still want to default to the first admin or an "Unassigned" option
+                    assignedAdminId: admins[0].id, 
+                    assignedAdminName: admins[0].name,
                 }
             }));
         }
@@ -171,7 +132,8 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
             onSave(newClient);
         } catch (error) {
             console.error("Failed to add client:", error);
-            // Replaced alert() with console.error()
+            // Don't use alert() in production apps, but leaving as per original code
+            alert("Failed to add client. Please try again."); 
         } finally {
             setIsSaving(false);
         }
@@ -215,7 +177,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                 <div><label className="label">Zip Code</label><input type="text" name="contactInfo.zip" value={formData.contactInfo.zip} onChange={handleInputChange} className="form-input" /></div>
                                 <div className="md:col-span-2"><label className="label">Referral Source</label><input type="text" name="referralSource" value={formData.referralSource} onChange={handleInputChange} className="form-input" /></div>
                             </div>
-                            <div><label className="label">Google Drive Link</label><input type="url" name="googleDriveLink" value={formData.googleDriveLink} onChange={handleInputChange} className="form-input" placeholder="httpss://drive.google.com/..." /></div>
+                            <div><label className="label">Google Drive Link</label><input type="url" name="googleDriveLink" value={formData.googleDriveLink} onChange={handleInputChange} className="form-input" placeholder="https://drive.google.com/..." /></div>
                         </fieldset>
 
                         {/* Case Management Section */}
@@ -227,11 +189,30 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                 {/* Removed 'required' from Assigned Case Manager */}
                                 <div><label className="label">Assigned Case Manager</label><select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input"><option value="">Unassigned</option>{admins.map(admin => (<option key={admin.id} value={admin.id}>{admin.name}</option>))}</select></div>
                             </div>
-                            {/* --- REMOVED old caseManagement checkboxes --- */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+                                <CheckboxInput label="Application Packet" name="caseManagement.applicationPacket" checked={formData.caseManagement.applicationPacket} onChange={handleInputChange} />
+                                <CheckboxInput label="ID" name="caseManagement.id" checked={formData.caseManagement.id} onChange={handleInputChange} />
+                                <CheckboxInput label="Proof of Income" name="caseManagement.proofOfIncome" checked={formData.caseManagement.proofOfIncome} onChange={handleInputChange} />
+                                <CheckboxInput label="Initial Assessment" name="caseManagement.initialAssessment" checked={formData.caseManagement.initialAssessment} onChange={handleInputChange} />
+                                <CheckboxInput label="ROI" name="caseManagement.roi" checked={formData.caseManagement.roi} onChange={handleInputChange} />
+                                <CheckboxInput label="ISP Completed" name="caseManagement.ispCompleted" checked={formData.caseManagement.ispCompleted} onChange={handleInputChange} />
+                            </div>
                         </fieldset>
                         
-                        {/* --- DELETED: Training Section was here --- */}
-                        
+                        {/* Training Section */}
+                        <fieldset className="space-y-4 p-4 border border-[#d1d1d1] rounded-md">
+                            <legend className="text-lg font-medium text-gray-700 px-1">Training & Certifications</legend>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <CheckboxInput label="CPR" name="training.cpr" checked={formData.training.cpr} onChange={handleInputChange} />
+                                <CheckboxInput label="First Aid" name="training.firstAid" checked={formData.training.firstAid} onChange={handleInputChange} />
+                                <CheckboxInput label="Food Handlers Card" name="training.foodHandlersCard" checked={formData.training.foodHandlersCard} onChange={handleInputChange} />
+                                <CheckboxInput label="Construction CTE" name="training.constructionCTE" checked={formData.training.constructionCTE} onChange={handleInputChange} />
+                                <CheckboxInput label="Cosmetology CTE" name="training.cosmetologyCTE" checked={formData.training.cosmetologyCTE} onChange={handleInputChange} />
+                                <CheckboxInput label="Culinary CTE" name="training.culinaryCTE" checked={formData.training.culinaryCTE} onChange={handleInputChange} />
+                                <CheckboxInput label="Fire CTE" name="training.fireCTE" checked={formData.training.fireCTE} onChange={handleInputChange} />
+                                <CheckboxInput label="Medical CTE" name="training.medicalCTE" checked={formData.training.medicalCTE} onChange={handleInputChange} />
+                            </div>
+                        </fieldset>
                     </div>
                     <div className="flex justify-end items-center p-4 border-t border-[#d1d1d1] bg-[#f2f2f2] sticky bottom-0">
                         <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 mr-3">Cancel</button>

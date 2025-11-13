@@ -1,3 +1,5 @@
+
+
 // User and Auth
 export type UserRole = 'admin' | 'viewer';
 
@@ -7,25 +9,6 @@ export interface User {
   email: string;
   role: UserRole;
 }
-
-// --- NEW Audit Checklist Types ---
-export interface AuditChecklistItem {
-  id: string; // e.g., "1.1"
-  label: string;
-  present: boolean;
-  complete: boolean;
-  uploaded: boolean;
-  notes: string;
-}
-
-export interface AuditChecklist {
-  onboarding: AuditChecklistItem[];
-  isp: AuditChecklistItem[];
-  caseNotes: AuditChecklistItem[];
-  workshops: AuditChecklistItem[];
-  misc: AuditChecklistItem[];
-}
-// ---------------------------------
 
 // Main Client Data Model
 export interface Client {
@@ -49,25 +32,24 @@ export interface Client {
   };
   referralSource: string;
 
-  // --- REPLACED caseManagement with auditChecklist ---
-  auditChecklist: AuditChecklist;
-  // --------------------------------------------------
+  caseManagement: {
+    applicationPacket: boolean;
+    id: boolean;
+    proofOfIncome: boolean;
+    initialAssessment: boolean;
+    roi: boolean;
+    ispCompleted: boolean;
+  };
 
   training: {
       cpr: boolean;
       firstAid: boolean;
       foodHandlersCard: boolean;
-      osha10: boolean; // Added
-      nccer: boolean; // Added
-      otherCertificates?: string;
       constructionCTE: boolean;
       cosmetologyCTE: boolean;
       culinaryCTE: boolean;
       fireCTE: boolean;
       medicalCTE: boolean;
-      earlyChildhoodEducationCTE: boolean; // Added
-      entrepreneurshipCTE: boolean; // Added
-      otherCteProgram?: string;
   };
 
   metadata: {

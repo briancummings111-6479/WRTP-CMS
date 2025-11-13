@@ -17,7 +17,6 @@ interface AddEditTaskModalProps {
 const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, onSave, taskToEdit, clientId, clientName, admins }) => {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
-  const [linkTo, setLinkTo] = useState(''); // Added state for link
   const [dueDate, setDueDate] = useState('');
   const [urgency, setUrgency] = useState<Task['urgency']>('Green');
   const [status, setStatus] = useState<Task['status']>('Open');
@@ -28,7 +27,6 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
     if (isOpen) {
       if (taskToEdit) {
         setTitle(taskToEdit.title);
-        setLinkTo(taskToEdit.linkTo || ''); // Set link on edit
         setDueDate(new Date(taskToEdit.dueDate).toISOString().split('T')[0]);
         setUrgency(taskToEdit.urgency);
         setStatus(taskToEdit.status);
@@ -36,7 +34,6 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
       } else {
         // Reset form for new task
         setTitle('');
-        setLinkTo(''); // Reset link
         setDueDate('');
         setUrgency('Green');
         setStatus('Open');
@@ -63,8 +60,8 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
       assignedToName: selectedAdmin?.name || 'Unknown',
       createdBy: user.name,
       status: status,
-      details: taskToEdit?.details || '', // This field isn't currently editable in the form
-      linkTo: linkTo || null, // Save the link
+      details: taskToEdit?.details || '',
+      linkTo: taskToEdit?.linkTo || null,
     };
 
     try {
@@ -74,7 +71,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
       onClose();
     } catch (error) {
       console.error("Failed to save task", error);
-      // alert("Failed to save task. Please try again."); // Removed alert
+      alert("Failed to save task. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -97,14 +94,6 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
               <label htmlFor="title" className="block text-sm font-medium text-gray-700">Description</label>
               <textarea id="title" value={title} onChange={(e) => setTitle(e.target.value)} rows={3} className="form-input mt-1" required />
             </div>
-            
-            {/* --- Added Link Input --- */}
-            <div>
-              <label htmlFor="linkTo" className="block text-sm font-medium text-gray-700">Link URL (Optional)</label>
-              <input type="url" id="linkTo" value={linkTo} onChange={(e) => setLinkTo(e.target.value)} className="form-input mt-1" placeholder="https://..." />
-            </div>
-            {/* ------------------------ */}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">Due Date</label>

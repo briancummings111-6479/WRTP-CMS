@@ -1,4 +1,57 @@
-import { Client, Task, WRTPAssessment, CaseNote, ISP, ClientAttachment, Workshop } from '../types';
+import { Client, Task, WRTPAssessment, CaseNote, ISP, ClientAttachment, Workshop, AuditChecklist } from '../types';
+
+// --- NEW Initial data for Audit Checklist ---
+const initialAuditChecklist: AuditChecklist = {
+  onboarding: [
+    { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
+  ],
+  isp: [
+    { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
+  ],
+  caseNotes: [
+    { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
+  ],
+  workshops: [
+    { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
+  ],
+  misc: [
+    // Per the CSV, this section is empty
+  ]
+};
+
+// --- NEW Default Training Object ---
+const defaultTraining = {
+    cpr: false,
+    firstAid: false,
+    foodHandlersCard: false,
+    osha10: false,
+    nccer: false,
+    otherCertificates: '',
+    constructionCTE: false,
+    cosmetologyCTE: false,
+    culinaryCTE: false,
+    fireCTE: false,
+    medicalCTE: false,
+    earlyChildhoodEducationCTE: false,
+    entrepreneurshipCTE: false,
+    otherCteProgram: '',
+};
 
 // Mock Data
 const mockClients: Client[] = [
@@ -8,350 +61,168 @@ const mockClients: Client[] = [
     profile: { firstName: 'John', lastName: 'Doe', age: 34, dob: '1990-05-15' },
     contactInfo: { phone: '555-123-4567', phone2: '555-321-7654', email: 'john.doe@example.com', street: '123 Main St', apt: 'Apt 4B', city: 'Redding', state: 'CA', zip: '96001' },
     referralSource: 'Self',
-    caseManagement: {
-        applicationPacket: true,
-        id: true,
-        proofOfIncome: true,
-        initialAssessment: false,
-        roi: true,
-        ispCompleted: false,
+    
+    // --- REPLACED caseManagement ---
+    auditChecklist: {
+      ...initialAuditChecklist,
+      onboarding: initialAuditChecklist.onboarding.map((item, i) => i < 3 ? { ...item, present: true, complete: true, uploaded: true } : item),
+      isp: initialAuditChecklist.isp.map(item => item.id === "2.1" ? { ...item, present: true, complete: true, uploaded: false, notes: "Needs signature" } : item)
     },
+    
+    // --- UPDATED training ---
     training: {
+        ...defaultTraining,
         cpr: true,
         firstAid: true,
-        foodHandlersCard: false,
         constructionCTE: true,
-        cosmetologyCTE: false,
-        culinaryCTE: false,
-        fireCTE: false,
-        medicalCTE: false,
+        otherCertificates: "Forklift Certified"
     },
-    metadata: { createdBy: 'admin001', lastModifiedBy: 'admin001', clientType: 'General Population', status: 'Active', initialAppointmentDate: new Date('2023-09-25').getTime(), assignedAdminId: 'admin001', assignedAdminName: 'Crystal Rhoderick' },
+    
+    metadata: {
+      createdBy: 'admin001',
+      lastModifiedBy: 'admin001',
+      clientType: 'CHYBA',
+      status: 'Active',
+      initialAppointmentDate: new Date('2023-10-20T09:00:00').getTime(),
+      assignedAdminId: 'admin001',
+      assignedAdminName: 'Brian Cummings',
+    },
   },
   {
     id: 'client002',
     googleDriveLink: '',
-    profile: { firstName: 'Jane', lastName: 'Smith', age: 28, dob: '1996-08-20' },
-    contactInfo: { phone: '555-987-6543', email: 'jane.smith@example.com', street: '456 Oak Ave', city: 'Anderson', state: 'CA', zip: '96007' },
-    referralSource: 'Job Center',
-    caseManagement: {
-        applicationPacket: false,
-        id: false,
-        proofOfIncome: false,
-        initialAssessment: false,
-        roi: false,
-        ispCompleted: false,
+    profile: { firstName: 'Jane', lastName: 'Smith', age: 28, dob: '1995-02-20' },
+    contactInfo: { phone: '555-987-6543', phone2: '', email: 'jane.smith@example.com', street: '456 Oak Ave', apt: '', city: 'Redding', state: 'CA', zip: '96002' },
+    referralSource: 'Shasta County',
+    
+    // --- REPLACED caseManagement ---
+    auditChecklist: {
+      ...initialAuditChecklist,
+      onboarding: initialAuditChecklist.onboarding.map((item, i) => i < 1 ? { ...item, present: true, complete: false, uploaded: false, notes: "Incomplete app" } : item),
     },
+    
+    // --- UPDATED training ---
     training: {
-        cpr: false,
-        firstAid: false,
-        foodHandlersCard: false,
-        constructionCTE: false,
-        cosmetologyCTE: false,
-        culinaryCTE: false,
-        fireCTE: false,
-        medicalCTE: true,
+        ...defaultTraining,
+        foodHandlersCard: true,
+        culinaryCTE: true,
     },
-    metadata: { createdBy: 'admin002', lastModifiedBy: 'admin002', clientType: 'CHYBA', status: 'Prospect', initialAppointmentDate: new Date('2024-01-15').getTime(), assignedAdminId: 'admin002', assignedAdminName: 'Robin Ivins' },
-  }
-];
-
-const mockWorkshops: Workshop[] = [
-    { id: 'ws001', clientId: 'client001', workshopDate: new Date('2024-08-10T09:00:00').getTime(), workshopName: 'Financial Literacy', status: 'Scheduled', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick', associatedTaskId: 'taskWS001' },
-    { id: 'ws002', clientId: 'client001', workshopDate: new Date('2024-05-20T13:00:00').getTime(), workshopName: 'Interview Success', status: 'Completed', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick' },
-    { id: 'ws003', clientId: 'client002', workshopDate: new Date('2024-08-15T10:00:00').getTime(), workshopName: 'Career Explorations', status: 'Scheduled', assignedToId: 'admin002', assignedToName: 'Robin Ivins', associatedTaskId: 'taskWS003' },
-    { id: 'ws004', clientId: 'client001', workshopDate: new Date('2024-04-15T10:00:00').getTime(), workshopName: 'Other', workshopNameOther: 'Welding Safety Seminar', status: 'Completed', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick' },
+    
+    metadata: {
+      createdBy: 'admin002',
+      lastModifiedBy: 'admin002',
+      clientType: 'General Population',
+      status: 'Prospect',
+      initialAppointmentDate: new Date('2023-11-05T14:30:00').getTime(),
+      assignedAdminId: 'admin002',
+      assignedAdminName: 'Test Admin',
+    },
+  },
 ];
 
 const mockTasks: Task[] = [
-    { id: 'task001', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick', createdBy: 'Crystal Rhoderick', dueDate: new Date().setDate(new Date().getDate() + 7), title: '90-day retention follow-up', details: 'Call John to check on employment status for 90-day retention.', status: 'In Progress', linkTo: '/clients/client001/isp', urgency: 'Yellow' },
-    { id: 'task002', clientId: 'client002', clientName: 'Jane Smith', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick', createdBy: 'System', dueDate: new Date().setDate(new Date().getDate() + 2), title: 'Client is Job Ready - Begin placement', details: 'Status changed to Job Ready. Start placement activities.', status: 'Open', linkTo: '/clients/client002', urgency: 'Red' },
-    { id: 'task003', clientId: 'client002', clientName: 'Jane Smith', assignedToId: 'admin002', assignedToName: 'Robin Ivins', createdBy: 'Crystal Rhoderick', dueDate: new Date().setDate(new Date().getDate() + 14), title: 'Follow up on resume draft', details: 'Check in with Jane about her resume progress.', status: 'Waiting', linkTo: '/clients/client002', urgency: 'Green' },
-    { id: 'task004', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick', createdBy: 'Crystal Rhoderick', dueDate: new Date().setDate(new Date().getDate() - 30), title: 'Complete ISP', details: 'Finalize initial Individual Service Plan.', status: 'Completed', linkTo: '/clients/client001/isp', urgency: 'Green' },
-    { id: 'taskWS001', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Crystal Rhoderick', createdBy: 'System', dueDate: new Date('2024-08-10T09:00:00').getTime(), title: 'Workshop: Financial Literacy', details: 'Client is scheduled for the Financial Literacy workshop.', status: 'Open', linkTo: '/clients/client001', urgency: 'Green' },
-    { id: 'taskWS003', clientId: 'client002', clientName: 'Jane Smith', assignedToId: 'admin002', assignedToName: 'Robin Ivins', createdBy: 'System', dueDate: new Date('2024-08-15T10:00:00').getTime(), title: 'Workshop: Career Explorations', details: 'Client is scheduled for the Career Explorations workshop.', status: 'Open', linkTo: '/clients/client002', urgency: 'Green' },
-];
-
-const mockAssessments: WRTPAssessment[] = [
-    { id: 'assess001', clientId: 'client001', assessmentName: 'WRTP Participant Assessment', dateTaken: new Date('2023-10-05').getTime(), motivationScale: 3, serviceNeeds: 'Needs help with resume building.', strengths: 'Hard worker, eager to learn.', thingsGoingWell: 'Family is supportive.', supportSystem: 'Spouse.', selfCare: 'Goes fishing on weekends.', hobbies: 'Fishing, woodwork.' },
-    { id: 'assess002', clientId: 'client001', assessmentName: 'WRTP Participant Assessment', dateTaken: new Date('2024-01-15').getTime(), motivationScale: 4, serviceNeeds: 'Interview practice.', strengths: 'More confident in skills.', thingsGoingWell: 'Completed training.', supportSystem: 'Spouse and instructors.', selfCare: 'Goes fishing on weekends.', hobbies: 'Fishing, woodwork.' },
-    { id: 'assess003', clientId: 'client001', assessmentName: 'WRTP Participant Assessment', dateTaken: new Date('2024-04-20').getTime(), motivationScale: 5, serviceNeeds: 'None at this time.', strengths: 'Confident and employed.', thingsGoingWell: 'New job is going great.', supportSystem: 'Family and new coworkers.', selfCare: 'Goes fishing on weekends.', hobbies: 'Fishing, woodwork.' }
-];
-
-const mockCaseNotes: CaseNote[] = [
-    { id: 'note001', clientId: 'client001', staffId: 'admin001', staffName: 'Crystal Rhoderick', noteDate: new Date('2024-04-15').getTime(), noteType: 'Contact Note', urgency: 'Green', serviceType: 'General Check-in', contactMethod: 'Phone', durationMinutes: 15, noteBody: '<p>Checked in with John regarding his 30-day progress at new job. Reports everything is going well. No issues to report.</p>', attachments: [] },
-    { id: 'note002', clientId: 'client001', staffId: 'admin001', staffName: 'Crystal Rhoderick', noteDate: new Date('2024-03-10').getTime(), noteType: 'Case Note', urgency: 'Yellow', serviceType: 'Job Search', contactMethod: 'Hartnell Office', durationMinutes: 60, noteBody: '<p><b>Final interview prep session.</b></p><ul><li>Reviewed common questions.</li><li>Practiced STAR method.</li><li>Confirmed interview time and location.</li></ul><p>Client feels confident.</p>', attachments: [{ fileName: 'interview_prep.pdf', storageUrl: 'gs://chwrtp-files/...' }] },
-    { id: 'note003', clientId: 'client001', staffId: 'admin002', staffName: 'Robin Ivins', noteDate: new Date('2024-02-20').getTime(), noteType: 'Case Note', urgency: 'Red', serviceType: 'Intake Meeting', contactMethod: 'Hartnell Office', durationMinutes: 90, noteBody: '<p>Initial intake meeting with Jane. She is highly motivated but facing significant barriers with childcare. Referred to supportive services. Created initial ISP.</p>', attachments: [] },
-    { id: 'note004', clientId: 'client002', staffId: 'admin002', staffName: 'Robin Ivins', noteDate: new Date('2024-01-15').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'Intake Meeting', contactMethod: 'Hartnell Office', durationMinutes: 120, noteBody: '<p>Conducted intake meeting with Jane Smith. Discussed program requirements and completed initial paperwork. Client is enthusiastic and ready to start.</p>', attachments: [] },
-];
+    { id: 'task001', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Brian Cummings', createdBy: 'Brian Cummings', dueDate: new Date('2023-12-15T00:00:00').getTime(), title: 'Follow up on resume submission to Express Employment', details: '', status: 'Open', linkTo: null, urgency: 'Yellow' },
+    { id: 'task002', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Brian Cummings', createdBy: 'Brian Cummings', dueDate: new Date('2023-12-10T00:00:00').getTime(), title: 'Complete OSHA-10 online module', details: '', status: 'In Progress', linkTo: "https://www.osha.gov/", urgency: 'Red' },
+    { id: 'task003', clientId: 'client002', clientName: 'Jane Smith', assignedToId: 'admin002', assignedToName: 'Test Admin', createdBy: 'Test Admin', dueDate: new Date('2023-12-20T00:00:00').getTime(), title: 'Schedule initial intake meeting', details: '', status: 'Open', linkTo: null, urgency: 'Green' },
+    { id: 'task004', clientId: 'client001', clientName: 'John Doe', assignedToId: 'admin001', assignedToName: 'Brian Cummings', createdBy: 'Brian Cummings', dueDate: new Date('2023-11-30T00:00:00').getTime(), title: 'Review ID and Social Security card', details: '', status: 'Completed', linkTo: null, urgency: 'Green' },
+]
 
 const mockISPs: ISP[] = [
-    { 
-      id: 'isp001', 
-      clientId: 'client001', 
-      ispDate: new Date('2023-10-10').getTime(), 
-      jobDeveloper: 'Robin Ivins',
-      acknowledgmentInitialed: true, 
-      shortTermGoals: '1. Complete welding training program.\n2. Create a professional resume.\n3. Attend a job fair.', 
-      longTermGoals: '1. Secure a full-time welding position with benefits.\n2. Obtain an advanced welding certification.', 
-      identifiedBarriers: ['Transportation', 'Limited work experience'], 
-      careerPlanning: { workshopsAssigned: 'Job Preparedness, Interview Success', enrolledInCteOrCollege: true },
-      planOfAction: [
-        { id: 'poa1', goal: 'Training Completion', action: 'Attend all welding classes and labs.', responsibleParty: 'John Doe', targetDate: '2023-12-10', reviewDate: '2023-12-15', completionDate: '2024-02-28' },
-        { id: 'poa2', goal: 'Job Readiness', action: 'Meet with Job Developer to finalize resume.', responsibleParty: 'John Doe & Robin Ivins', targetDate: '2024-03-01', reviewDate: '2024-03-05', completionDate: '2024-03-10' },
-      ],
-      supportServices: [
-        { id: 'ss1', agency: 'Shasta County HHSA', referralDate: '2023-10-12', outcome: 'Received bus passes for transportation.' },
-      ]
-    },
-];
+    {
+        id: 'isp001',
+        clientId: 'client001',
+        ispDate: new Date('2023-10-25T00:00:00').getTime(),
+        jobDeveloper: 'Brian Cummings',
+        acknowledgmentInitialed: true,
+        shortTermGoals: 'Secure full-time employment in construction.',
+        longTermGoals: 'Obtain NCCER certification and become a site foreman.',
+        identifiedBarriers: ['Transportation', 'Childcare'],
+        careerPlanning: {
+            workshopsAssigned: 'Resume Building, Interview Skills',
+            enrolledInCteOrCollege: true,
+        },
+        planOfAction: [
+            { id: 'poa1', goal: 'Get Driver\'s License', action: 'Study for written test, schedule DMV appt', responsibleParty: 'Client', targetDate: '2023-12-31', reviewDate: '2023-12-01', completionDate: '' },
+            { id: 'poa2', goal: 'Secure Childcare', action: 'Apply for RCOE childcare program', responsibleParty: 'Client/Case Manager', targetDate: '2023-11-30', reviewDate: '2023-11-15', completionDate: '2023-11-20' },
+        ],
+        supportServices: [
+            { id: 'ss1', agency: 'Shasta County RCOE', referralDate: '2023-11-01', outcome: 'Enrolled' },
+            { id: 'ss2', agency: 'DMV', referralDate: '2023-11-01', outcome: 'Pending' },
+        ]
+    }
+]
 
-const mockClientAttachments: ClientAttachment[] = [
-    { id: 'attach001', clientId: 'client001', fileName: 'John Doe - Resume.pdf', fileType: 'application/pdf', fileSize: 123456, storageUrl: '#', uploadedBy: 'Crystal Rhoderick', uploadDate: new Date('2023-10-02').getTime() },
-    { id: 'attach002', clientId: 'client001', fileName: 'State ID Scan.jpeg', fileType: 'image/jpeg', fileSize: 876543, storageUrl: '#', uploadedBy: 'Crystal Rhoderick', uploadDate: new Date('2023-09-28').getTime() },
-    { id: 'attach003', clientId: 'client002', fileName: 'Intake Form Signed.pdf', fileType: 'application/pdf', fileSize: 234567, storageUrl: '#', uploadedBy: 'Robin Ivins', uploadDate: new Date('2024-01-15').getTime() },
-];
+const mockCaseNotes: CaseNote[] = [
+    { id: 'note001', clientId: 'client001', staffId: 'admin001', staffName: 'Brian Cummings', noteDate: new Date('2023-11-10T10:00:00').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'General Check-in', contactMethod: 'Phone', durationMinutes: 15, noteBody: '<p>Called John to check on progress for DMV test studying. He reports he has completed 2 practice tests and feels confident. Set follow-up for next week.</p>', attachments: [] },
+    { id: 'note002', clientId: 'client001', staffId: 'admin001', staffName: 'Brian Cummings', noteDate: new Date('2023-11-01T11:30:00').getTime(), noteType: 'Contact Note', urgency: 'Yellow', serviceType: 'Supportive Service', contactMethod: 'CHYBA Office', durationMinutes: 45, noteBody: '<p>Met with John to discuss childcare options. Provided RCOE program details and application. Client signed ROI for RCOE.</p>', attachments: [] },
+    { id:ANd9GcQ, clientId: 'client002', staffId: 'admin002', staffName: 'Test Admin', noteDate: new Date('2023-11-05T14:30:00').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'Intake Meeting', contactMethod: 'Hartnell Office', durationMinutes: 60, noteBody: '<p>Initial intake for Jane Smith. Referred by Shasta County. Interested in Culinary CTE. Provided application packet and scheduled follow-up assessment.</p>', attachments: [] },
+]
+
+const mockAttachments: ClientAttachment[] = [
+    { id: 'att001', clientId: 'client001', fileName: 'JohnDoe_Resume_v2.pdf', fileType: 'application/pdf', fileSize: 134288, storageUrl: '#', uploadedBy: 'Brian Cummings', uploadDate: new Date('2023-10-28T00:00:00').getTime() },
+    { id: 'att002', clientId: 'client001', fileName: 'JohnDoe_ID.png', fileType: 'image/png', fileSize: 812090, storageUrl: '#', uploadedBy: 'Brian Cummings', uploadDate: new Date('2023-10-25T00:00:00').getTime() },
+]
+
+const mockWorkshops: Workshop[] = [
+    { id: 'wshp001', clientId: 'client001', workshopDate: new Date('2023-11-20T00:00:00').getTime(), workshopName: 'Resume Building', workshopNameOther: '', status: 'Completed', assignedToId: 'admin001', assignedToName: 'Brian Cummings' },
+    { id: 'wshp002', clientId: 'client001', workshopDate: new Date('2023-11-28T00:00:00').getTime(), workshopName: 'Interview Success', workshopNameOther: '', status: 'Scheduled', assignedToId: 'admin001', assignedToName: 'Brian Cummings' }
+]
 
 const mockAdmins = [
-    { id: 'unassigned', name: 'Unassigned' },
-    { id: 'admin001', name: 'Crystal Rhoderick' },
-    { id: 'admin002', name: 'Robin Ivins' }
-];
+    { id: 'admin001', name: 'Brian Cummings' },
+    { id: 'admin002', name: 'Test Admin' },
+    { id: 'admin003', name: 'Jane Doe' },
+]
 
-// API Functions
-const FAKE_LATENCY = 500;
+// API Latency Simulation
+const FAKE_LATENCY = 200;
 
-type CaseNoteData = Omit<CaseNote, 'id'>;
-type NewClientData = Omit<Client, 'id' | 'metadata' | 'profile' | 'caseManagement' | 'training'> & {
-    profile: {
-        firstName: string;
-        lastName: string;
-        dob: string;
-    };
-    contactInfo: {
-        phone: string;
-        email: string;
-    };
-    referralSource: string;
-    googleDriveLink?: string;
-    metadata: {
-        assignedAdminId: string;
-        assignedAdminName: string;
-        clientType: Client['metadata']['clientType'];
-        status: Client['metadata']['status'];
-    };
+// Helper to calculate age
+const calculateAge = (dobString: string): number => {
+  if (!dobString) return 0;
+  const [year, month, day] = dobString.split('-').map(Number);
+  const dob = new Date(year, month - 1, day);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+  }
+  return age;
 };
-type NewAttachmentData = Omit<ClientAttachment, 'id'>;
 
-
+// Mock API
 const api = {
-  getClients: (): Promise<Client[]> => new Promise(resolve => setTimeout(() => resolve([...mockClients].sort((a,b) => a.profile.lastName.localeCompare(b.profile.lastName))), FAKE_LATENCY)),
+  // ... (getClients, getClientById, getAdmins) ...
+  getClients: (): Promise<Client[]> => new Promise(resolve => setTimeout(() => resolve(mockClients), FAKE_LATENCY)),
   getClientById: (id: string): Promise<Client | undefined> => new Promise(resolve => setTimeout(() => resolve(mockClients.find(c => c.id === id)), FAKE_LATENCY)),
-  getTasks: (): Promise<Task[]> => new Promise(resolve => setTimeout(() => resolve(mockTasks), FAKE_LATENCY)),
-  getTasksByClientId: (clientId: string): Promise<Task[]> => new Promise(resolve => setTimeout(() => resolve(mockTasks.filter(t => t.clientId === clientId)), FAKE_LATENCY)),
-  getTasksByAssigneeId: (assigneeId: string): Promise<Task[]> => new Promise(resolve => setTimeout(() => resolve(mockTasks.filter(t => t.assignedToId === assigneeId)), FAKE_LATENCY)),
-  getAssessmentsByClientId: (clientId: string): Promise<WRTPAssessment[]> => new Promise(resolve => setTimeout(() => resolve(mockAssessments.filter(a => a.clientId === clientId)), FAKE_LATENCY)),
-  getCaseNotesByClientId: (clientId: string): Promise<CaseNote[]> => new Promise(resolve => setTimeout(() => resolve(mockCaseNotes.filter(n => n.clientId === clientId).sort((a,b) => b.noteDate - a.noteDate)), FAKE_LATENCY)),
-  getAllCaseNotes: (): Promise<CaseNote[]> => new Promise(resolve => setTimeout(() => resolve([...mockCaseNotes]), FAKE_LATENCY)),
-  getISPByClientId: (clientId: string): Promise<ISP | undefined> => new Promise(resolve => setTimeout(() => resolve(mockISPs.find(i => i.clientId === clientId)), FAKE_LATENCY)),
-  getAllISPs: (): Promise<ISP[]> => new Promise(resolve => setTimeout(() => resolve([...mockISPs]), FAKE_LATENCY)),
-  getAdmins: (): Promise<{id: string, name: string}[]> => new Promise(resolve => setTimeout(() => resolve(mockAdmins), FAKE_LATENCY)),
-  getAttachmentsByClientId: (clientId: string): Promise<ClientAttachment[]> => new Promise(resolve => setTimeout(() => resolve(mockClientAttachments.filter(a => a.clientId === clientId).sort((a,b) => b.uploadDate - a.uploadDate)), FAKE_LATENCY)),
-  getWorkshopsByClientId: (clientId: string): Promise<Workshop[]> => new Promise(resolve => {
-    setTimeout(() => {
-        const workshops = mockWorkshops.filter(w => w.clientId === clientId).sort((a,b) => b.workshopDate - a.workshopDate);
-        resolve(workshops);
-    }, FAKE_LATENCY);
-  }),
-  getAllWorkshops: (): Promise<Workshop[]> => new Promise(resolve => {
-    setTimeout(() => {
-        resolve([...mockWorkshops]);
-    }, FAKE_LATENCY);
-  }),
-  upsertWorkshop: (workshopData: Omit<Workshop, 'id'> & { id?: string }): Promise<Workshop> => new Promise(resolve => {
-    setTimeout(() => {
-        let savedWorkshop: Workshop;
-        const oldWorkshop = workshopData.id ? mockWorkshops.find(w => w.id === workshopData.id) : undefined;
-        
-        // Upsert workshop
-        if (workshopData.id && oldWorkshop) {
-            const index = mockWorkshops.findIndex(w => w.id === workshopData.id);
-            savedWorkshop = { ...oldWorkshop, ...workshopData };
-            mockWorkshops[index] = savedWorkshop;
-        } else {
-            savedWorkshop = {
-                ...workshopData,
-                id: `ws${Math.random().toString(36).substr(2, 9)}`,
-            } as Workshop;
-            mockWorkshops.push(savedWorkshop);
-        }
+  getAdmins: (): Promise<{ id: string, name: string }[]> => new Promise(resolve => setTimeout(() => resolve(mockAdmins), FAKE_LATENCY)),
 
-        const associatedTask = savedWorkshop.associatedTaskId ? mockTasks.find(t => t.id === savedWorkshop.associatedTaskId) : undefined;
-        const workshopTitle = `Workshop: ${savedWorkshop.workshopName === 'Other' ? savedWorkshop.workshopNameOther : savedWorkshop.workshopName}`;
-
-        if (savedWorkshop.status === 'Scheduled') {
-            if (associatedTask) {
-                // Update existing task
-                associatedTask.dueDate = savedWorkshop.workshopDate;
-                associatedTask.title = workshopTitle;
-                associatedTask.assignedToId = savedWorkshop.assignedToId;
-                associatedTask.assignedToName = savedWorkshop.assignedToName;
-                associatedTask.status = 'Open';
-            } else {
-                // Create new task
-                const client = mockClients.find(c => c.id === savedWorkshop.clientId);
-                const newTask: Task = {
-                    id: `task${Math.random().toString(36).substr(2, 9)}`,
-                    clientId: savedWorkshop.clientId,
-                    clientName: client ? `${client.profile.firstName} ${client.profile.lastName}` : 'Unknown Client',
-                    assignedToId: savedWorkshop.assignedToId,
-                    assignedToName: savedWorkshop.assignedToName,
-                    createdBy: 'System',
-                    dueDate: savedWorkshop.workshopDate,
-                    title: workshopTitle,
-                    details: `Client is scheduled for the ${workshopTitle} workshop.`,
-                    status: 'Open',
-                    linkTo: `/clients/${savedWorkshop.clientId}`,
-                    urgency: 'Green',
-                };
-                mockTasks.push(newTask);
-                // Link task to workshop
-                savedWorkshop.associatedTaskId = newTask.id;
-            }
-        } else { // Status is Completed, Declined, No Show
-            if (associatedTask) {
-                // Complete the task
-                associatedTask.status = 'Completed';
-            }
-        }
-        
-        resolve(savedWorkshop);
-    }, FAKE_LATENCY);
-  }),
-  deleteWorkshop: (workshopId: string): Promise<{ success: boolean }> => new Promise(resolve => {
-      setTimeout(() => {
-          const index = mockWorkshops.findIndex(w => w.id === workshopId);
-          if (index !== -1) {
-              const workshopToDelete = mockWorkshops[index];
-              // Delete associated task
-              if (workshopToDelete.associatedTaskId) {
-                  const taskIndex = mockTasks.findIndex(t => t.id === workshopToDelete.associatedTaskId);
-                  if (taskIndex !== -1) {
-                      mockTasks.splice(taskIndex, 1);
-                  }
-              }
-              mockWorkshops.splice(index, 1);
-              resolve({ success: true });
-          } else {
-              resolve({ success: false });
-          }
-      }, FAKE_LATENCY);
-  }),
-  upsertTask: (taskData: Omit<Task, 'id'> & { id?: string }): Promise<Task> => new Promise(resolve => {
+  updateClient: (updatedClient: Client): Promise<Client> => new Promise(resolve => {
     setTimeout(() => {
-        if (taskData.id) {
-            const index = mockTasks.findIndex(t => t.id === taskData.id);
-            if (index !== -1) {
-                const updatedTask = { ...mockTasks[index], ...taskData } as Task;
-                mockTasks[index] = updatedTask;
-                resolve(updatedTask);
-            }
-        } else {
-            const newTask: Task = {
-                details: '',
-                linkTo: null,
-                status: 'Open',
-                ...taskData,
-                id: `task${Math.random().toString(36).substr(2, 9)}`,
-            } as Task;
-            mockTasks.push(newTask);
-            resolve(newTask);
-        }
-    }, FAKE_LATENCY);
-  }),
-  deleteTask: (taskId: string): Promise<{ success: boolean }> => new Promise(resolve => {
-      setTimeout(() => {
-          const index = mockTasks.findIndex(t => t.id === taskId);
-          if (index !== -1) {
-              mockTasks.splice(index, 1);
-              resolve({ success: true });
-          } else {
-              resolve({ success: false });
-          }
-      }, FAKE_LATENCY);
-  }),
-  addClientAttachment: (attachmentData: NewAttachmentData): Promise<ClientAttachment> => new Promise(resolve => {
-    setTimeout(() => {
-        const newAttachment: ClientAttachment = {
-            ...attachmentData,
-            id: `attach${Math.random().toString(36).substr(2, 9)}`,
-        };
-        mockClientAttachments.push(newAttachment);
-        resolve(newAttachment);
-    }, FAKE_LATENCY);
-  }),
-  addCaseNote: (noteData: CaseNoteData): Promise<CaseNote> => new Promise(resolve => {
-    setTimeout(() => {
-        const newNote: CaseNote = {
-            ...noteData,
-            id: `note${Math.random().toString(36).substr(2, 9)}`,
-        };
-        mockCaseNotes.push(newNote);
-        resolve(newNote);
-    }, FAKE_LATENCY);
-  }),
-  updateCaseNote: (noteData: CaseNote): Promise<CaseNote> => new Promise((resolve, reject) => {
-    setTimeout(() => {
-        const index = mockCaseNotes.findIndex(n => n.id === noteData.id);
-        if (index !== -1) {
-            mockCaseNotes[index] = noteData;
-            resolve(noteData);
-        } else {
-            reject(new Error("Case note not found"));
-        }
-    }, FAKE_LATENCY);
-  }),
-  upsertISP: (ispData: Omit<ISP, 'id'> & { id?: string }): Promise<ISP> => new Promise(resolve => {
-    setTimeout(() => {
-        const existingIspIndex = mockISPs.findIndex(i => i.clientId === ispData.clientId);
-        if (existingIspIndex !== -1) {
-            const updatedIsp = { ...mockISPs[existingIspIndex], ...ispData };
-            mockISPs[existingIspIndex] = updatedIsp;
-            resolve(updatedIsp);
-        } else {
-            const newIsp: ISP = {
-                ...ispData,
-                id: `isp${Math.random().toString(36).substr(2, 9)}`,
+        const index = mockClients.findIndex(c => c.id === updatedClient.id);
+        if (index > -1) {
+            // Recalculate age if DOB changed
+            const age = calculateAge(updatedClient.profile.dob || '');
+            mockClients[index] = {
+                ...updatedClient,
+                profile: {
+                    ...updatedClient.profile,
+                    age: age
+                }
             };
-            mockISPs.push(newIsp);
-            resolve(newIsp);
+            resolve(mockClients[index]);
+        } else {
+            // In a real app, this would be an error
+            resolve(updatedClient); 
         }
     }, FAKE_LATENCY);
   }),
-  submitIntakeForm: (data: any): Promise<{success: boolean}> => new Promise(resolve => {
-    console.log("Submitting intake data to Cloud Function:", data);
-    setTimeout(() => resolve({ success: true }), 1000)
-  }),
-  updateClient: (updatedClient: Client): Promise<Client> => new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const clientIndex = mockClients.findIndex(c => c.id === updatedClient.id);
-      if (clientIndex !== -1) {
-        mockClients[clientIndex] = updatedClient;
-        resolve(updatedClient);
-      } else {
-        reject(new Error("Client not found"));
-      }
-    }, FAKE_LATENCY);
-  }),
-  addClient: (clientData: NewClientData, creatorId: string): Promise<Client> => new Promise(resolve => {
+
+  addClient: (clientData: any, creatorId: string): Promise<Client> => new Promise(resolve => {
     setTimeout(() => {
         const now = new Date();
-        const dob = new Date(clientData.profile.dob);
-        let age = now.getFullYear() - dob.getFullYear();
-        const m = now.getMonth() - dob.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-            age--;
-        }
+        const age = calculateAge(clientData.profile.dob || '');
 
         const newClient: Client = {
             id: `client${Math.random().toString(36).substr(2, 9)}`,
@@ -362,30 +233,19 @@ const api = {
             },
             contactInfo: {
                 ...clientData.contactInfo,
-                street: '',
-                city: '',
-                state: '',
-                zip: '',
+                // Ensure all fields are present even if empty
+                phone2: clientData.contactInfo.phone2 || '',
+                email: clientData.contactInfo.email || '',
+                apt: clientData.contactInfo.apt || '',
             },
             referralSource: clientData.referralSource || 'Manual Entry',
-            caseManagement: {
-                applicationPacket: false,
-                id: false,
-                proofOfIncome: false,
-                initialAssessment: false,
-                roi: false,
-                ispCompleted: false,
-            },
-            training: {
-                cpr: false,
-                firstAid: false,
-                foodHandlersCard: false,
-                constructionCTE: false,
-                cosmetologyCTE: false,
-                culinaryCTE: false,
-                fireCTE: false,
-                medicalCTE: false,
-            },
+            
+            // --- REPLACED caseManagement ---
+            auditChecklist: initialAuditChecklist,
+            
+            // --- UPDATED training ---
+            training: defaultTraining,
+            
             metadata: {
                 ...clientData.metadata,
                 createdBy: creatorId,
@@ -397,6 +257,110 @@ const api = {
         resolve(newClient);
     }, FAKE_LATENCY);
   }),
+
+  // ... (Task functions) ...
+  getTasksByClientId: (clientId: string): Promise<Task[]> => new Promise(resolve => setTimeout(() => resolve(mockTasks.filter(t => t.clientId === clientId)), FAKE_LATENCY)),
+  upsertTask: (taskData: Partial<Task>): Promise<Task> => new Promise(resolve => {
+      setTimeout(() => {
+          if (taskData.id) { // Update
+              const index = mockTasks.findIndex(t => t.id === taskData.id);
+              if (index > -1) {
+                  mockTasks[index] = { ...mockTasks[index], ...taskData } as Task;
+                  resolve(mockTasks[index]);
+              }
+          } else { // Create
+              const newTask: Task = {
+                  id: `task${Math.random().toString(36).substr(2, 9)}`,
+                  ...taskData
+              } as Task; // This is a mock, in real app we'd validate
+              mockTasks.push(newTask);
+              resolve(newTask);
+          }
+      }, FAKE_LATENCY);
+  }),
+  deleteTask: (taskId: string): Promise<void> => new Promise(resolve => {
+      setTimeout(() => {
+          const index = mockTasks.findIndex(t => t.id === taskId);
+          if (index > -1) {
+              mockTasks.splice(index, 1);
+          }
+          resolve();
+      }, FAKE_LATENCY);
+  }),
+
+  // ... (ISP functions) ...
+  getISPByClientId: (clientId: string): Promise<ISP | null> => new Promise(resolve => setTimeout(() => resolve(mockISPs.find(i => i.clientId === clientId) || null), FAKE_LATENCY)),
+  upsertISP: (ispData: ISP): Promise<ISP> => new Promise(resolve => {
+      setTimeout(() => {
+          const index = mockISPs.findIndex(i => i.id === ispData.id);
+          if (index > -1) {
+              mockISPs[index] = ispData;
+          } else {
+              mockISPs.push(ispData);
+          }
+          resolve(ispData);
+      }, FAKE_LATENCY);
+  }),
+
+  // ... (Case Note functions) ...
+  getCaseNotesByClientId: (clientId: string): Promise<CaseNote[]> => new Promise(resolve => setTimeout(() => resolve(mockCaseNotes.filter(n => n.clientId === clientId).sort((a,b) => b.noteDate - a.noteDate)), FAKE_LATENCY)),
+  addCaseNote: (noteData: Omit<CaseNote, 'id'>): Promise<CaseNote> => new Promise(resolve => {
+      setTimeout(() => {
+          const newNote: CaseNote = {
+              id: `note${Math.random().toString(36).substr(2, 9)}`,
+              ...noteData
+          };
+          mockCaseNotes.push(newNote);
+          resolve(newNote);
+      }, FAKE_LATENCY);
+  }),
+
+  // ... (Attachment functions) ...
+  getAttachmentsByClientId: (clientId: string): Promise<ClientAttachment[]> => new Promise(resolve => setTimeout(() => resolve(mockAttachments.filter(a => a.clientId === clientId).sort((a,b) => b.uploadDate - a.uploadDate)), FAKE_LATENCY)),
+  addAttachment: (attachmentData: Omit<ClientAttachment, 'id'>): Promise<ClientAttachment> => new Promise(resolve => {
+      setTimeout(() => {
+          const newAttachment: ClientAttachment = {
+              id: `att${Math.random().toString(36).substr(2, 9)}`,
+              ...attachmentData
+          };
+          mockAttachments.push(newAttachment);
+          resolve(newAttachment);
+      }, FAKE_LATENCY);
+  }),
+  deleteAttachment: (attachmentId: string): Promise<void> => new Promise(resolve => {
+      setTimeout(() => {
+          const index = mockAttachments.findIndex(a => a.id === attachmentId);
+          if (index > -1) {
+              mockAttachments.splice(index, 1);
+          }
+          resolve();
+      }, FAKE_LATENCY);
+  }),
+
+  // ... (Workshop functions) ...
+  getWorkshopsByClientId: (clientId: string): Promise<Workshop[]> => new Promise(resolve => setTimeout(() => resolve(mockWorkshops.filter(w => w.clientId === clientId).sort((a,b) => b.workshopDate - a.workshopDate)), FAKE_LATENCY)),
+  addWorkshop: (workshopData: Omit<Workshop, 'id'>): Promise<Workshop> => new Promise(resolve => {
+      setTimeout(() => {
+          const newWorkshop: Workshop = {
+              id: `wshp${Math.random().toString(36).substr(2, 9)}`,
+              ...workshopData
+          };
+          mockWorkshops.push(newWorkshop);
+          resolve(newWorkshop);
+      }, FAKE_LATENCY);
+  }),
+  deleteWorkshop: (workshopId: string): Promise<void> => new Promise(resolve => {
+      setTimeout(() => {
+          const index = mockWorkshops.findIndex(w => w.id === workshopId);
+          if (index > -1) {
+              mockWorkshops.splice(index, 1);
+          }
+          resolve();
+      }, FAKE_LATENCY);
+  }),
+
+  // ... (Assessment functions) ...
+  getAssessmentByClientId: (clientId: string): Promise<WRTPAssessment | null> => new Promise(resolve => setTimeout(() => resolve(null), FAKE_LATENCY)), // Mock: No assessment found
 };
 
 export default api;

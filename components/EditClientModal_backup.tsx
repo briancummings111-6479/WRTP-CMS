@@ -71,7 +71,8 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
       await onSave(formData);
     } catch (error) {
       console.error("Failed to save client:", error);
-      // Replaced alert() with console.error()
+      // Don't use alert() in production apps, but leaving as per original code
+      alert("Failed to save client information. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -139,7 +140,20 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
                 </div>
             </fieldset>
             
-            {/* --- DELETED: Training Section was here --- */}
+            {/* Training Section */}
+            <fieldset className="space-y-4 p-4 border rounded-md">
+                <legend className="text-lg font-medium text-gray-700 px-1">Training & Certifications</legend>
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <CheckboxInput label="CPR" name="training.cpr" checked={formData.training.cpr} onChange={handleInputChange} />
+                    <CheckboxInput label="First Aid" name="training.firstAid" checked={formData.training.firstAid} onChange={handleInputChange} />
+                    <CheckboxInput label="Food Handlers Card" name="training.foodHandlersCard" checked={formData.training.foodHandlersCard} onChange={handleInputChange} />
+                    <CheckboxInput label="Construction CTE" name="training.constructionCTE" checked={formData.training.constructionCTE} onChange={handleInputChange} />
+                    <CheckboxInput label="Cosmetology CTE" name="training.cosmetologyCTE" checked={formData.training.cosmetologyCTE} onChange={handleInputChange} />
+                    <CheckboxInput label="Culinary CTE" name="training.culinaryCTE" checked={formData.training.culinaryCTE} onChange={handleInputChange} />
+                    <CheckboxInput label="Fire CTE" name="training.fireCTE" checked={formData.training.fireCTE} onChange={handleInputChange} />
+                    <CheckboxInput label="Medical CTE" name="training.medicalCTE" checked={formData.training.medicalCTE} onChange={handleInputChange} />
+                </div>
+            </fieldset>
 
           </div>
           <div className="flex justify-end items-center p-4 border-t bg-gray-50 sticky bottom-0">

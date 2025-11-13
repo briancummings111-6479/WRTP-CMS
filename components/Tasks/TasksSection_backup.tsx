@@ -72,7 +72,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         setTasks(prev => prev.filter(t => t.id !== taskId));
     } catch (error) {
         console.error("Failed to delete task", error);
-        // alert("Failed to delete task. Please try again."); // Removed alert
+        alert("Failed to delete task. Please try again.");
     }
   };
 
