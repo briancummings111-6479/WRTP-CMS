@@ -155,7 +155,8 @@ const mockISPs: ISP[] = [
 const mockCaseNotes: CaseNote[] = [
     { id: 'note001', clientId: 'client001', staffId: 'admin001', staffName: 'Brian Cummings', noteDate: new Date('2023-11-10T10:00:00').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'General Check-in', contactMethod: 'Phone', durationMinutes: 15, noteBody: '<p>Called John to check on progress for DMV test studying. He reports he has completed 2 practice tests and feels confident. Set follow-up for next week.</p>', attachments: [] },
     { id: 'note002', clientId: 'client001', staffId: 'admin001', staffName: 'Brian Cummings', noteDate: new Date('2023-11-01T11:30:00').getTime(), noteType: 'Contact Note', urgency: 'Yellow', serviceType: 'Supportive Service', contactMethod: 'CHYBA Office', durationMinutes: 45, noteBody: '<p>Met with John to discuss childcare options. Provided RCOE program details and application. Client signed ROI for RCOE.</p>', attachments: [] },
-    { id:ANd9GcQ, clientId: 'client002', staffId: 'admin002', staffName: 'Test Admin', noteDate: new Date('2023-11-05T14:30:00').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'Intake Meeting', contactMethod: 'Hartnell Office', durationMinutes: 60, noteBody: '<p>Initial intake for Jane Smith. Referred by Shasta County. Interested in Culinary CTE. Provided application packet and scheduled follow-up assessment.</p>', attachments: [] },
+    // --- THIS WAS THE LINE WITH THE ERROR. FIXED 'ANd9GcQ' to 'note003' ---
+    { id: 'note003', clientId: 'client002', staffId: 'admin002', staffName: 'Test Admin', noteDate: new Date('2023-11-05T14:30:00').getTime(), noteType: 'Case Note', urgency: 'Green', serviceType: 'Intake Meeting', contactMethod: 'Hartnell Office', durationMinutes: 60, noteBody: '<p>Initial intake for Jane Smith. Referred by Shasta County. Interested in Culinary CTE. Provided application packet and scheduled follow-up assessment.</p>', attachments: [] },
 ]
 
 const mockAttachments: ClientAttachment[] = [
@@ -165,7 +166,7 @@ const mockAttachments: ClientAttachment[] = [
 
 const mockWorkshops: Workshop[] = [
     { id: 'wshp001', clientId: 'client001', workshopDate: new Date('2023-11-20T00:00:00').getTime(), workshopName: 'Resume Building', workshopNameOther: '', status: 'Completed', assignedToId: 'admin001', assignedToName: 'Brian Cummings' },
-    { id: 'wshp002', clientId: 'client001', workshopDate: new Date('2023-11-28T00:00:00').getTime(), workshopName: 'Interview Success', workshopNameOther: '', status: 'Scheduled', assignedToId: 'admin001', assignedToName: 'Brian Cummings' }
+    { id: 'wshp002', clientId: 'client001', workshopDate: new Date('2Which 1-28T00:00:00').getTime(), workshopName: 'Interview Success', workshopNameOther: '', status: 'Scheduled', assignedToId: 'admin001', assignedToName: 'Brian Cummings' }
 ]
 
 const mockAdmins = [

@@ -19,19 +19,27 @@ type TrainingBooleanKeys = {
 }[keyof Client['training']];
 // ------------------------------
 
-// Helper component for form checkboxes
-const CheckboxInput = ({ label, name, checked, onChange }: { 
-  label: string, 
-  name: string, 
-  checked: boolean, 
-  // --- FIX: Broadened this type to match the handler it receives ---
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
-}) => (
+// --- FIX 1: Changed from inline type to a proper interface and React.FC ---
+interface CheckboxInputProps {
+  label: string;
+  name: string;
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+}
+
+const CheckboxInput: React.FC<CheckboxInputProps> = ({ label, name, checked, onChange }) => (
     <label className="flex items-center">
-        <input type="checkbox" name={name} checked={checked} onChange={onChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
+        <input 
+          type="checkbox" 
+          name={name} 
+          checked={checked} 
+          onChange={onChange} 
+          className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" 
+        />
         <span className="ml-2 text-gray-700">{label}</span>
     </label>
 );
+// --------------------------------------------------------------------
 
 // Helper component for display list items
 const DisplayListItem: React.FC<{ label: string }> = ({ label }) => (
@@ -133,12 +141,12 @@ const ClientDashboardPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('Case Notes');
-  
+
   // State for the Training Form
   const [isEditingTraining, setIsEditingTraining] = useState(false);
   const [trainingData, setTrainingData] = useState<Client['training'] | null>(null);
   const [isTrainingSaving, setIsTrainingSaving] = useState(false);
-  
+
   // --- NEW State for the Audit Checklist Form ---
   const [isEditingAuditChecklist, setIsEditingAuditChecklist] = useState(false);
   const [auditChecklistData, setAuditChecklistData] = useState<AuditChecklist | null>(null);
@@ -228,12 +236,12 @@ const ClientDashboardPage: React.FC = () => {
 
   const handleTrainingSave = async () => {
     if (!client || !trainingData) return;
-    
+
     setIsTrainingSaving(true);
     try {
-      await handleSaveClient({ 
-        ...client, 
-        training: trainingData 
+      await handleSaveClient({
+        ...client,
+        training: trainingData
       });
       setIsEditingTraining(false); // Close edit mode on save
     } catch (error) {
@@ -248,7 +256,7 @@ const ClientDashboardPage: React.FC = () => {
     setTrainingData(client?.training || null);
     setIsEditingTraining(false);
   };
-  
+
   // --- NEW Handlers for Audit Checklist Form ---
   const handleAuditChecklistChange = (
     section: keyof AuditChecklist,
@@ -258,8 +266,8 @@ const ClientDashboardPage: React.FC = () => {
   ) => {
     setAuditChecklistData(prev => {
       if (!prev) return null;
-      
-      const newSectionData = prev[section].map(item => 
+
+      const newSectionData = prev[section].map(item =>
         item.id === itemId ? { ...item, [field]: value } : item
       );
 
@@ -272,16 +280,16 @@ const ClientDashboardPage: React.FC = () => {
 
   const handleAuditChecklistSave = async () => {
     if (!client || !auditChecklistData) return;
-    
+
     setIsAuditChecklistSaving(true);
     try {
-      await handleSaveClient({ 
-        ...client, 
-        auditChecklist: auditChecklistData 
+      await handleSaveClient({
+        ...client,
+        auditChecklist: auditChecklistData
       });
       setIsEditingAuditChecklist(false); // Close edit mode on save
     } catch (error) {
-      console.error("Failed to save audit checklist", error);
+      console.error("Failed to save audit checklist:", error);
     } finally {
       setIsAuditChecklistSaving(false);
     }
@@ -292,7 +300,7 @@ const ClientDashboardPage: React.FC = () => {
     setIsEditingAuditChecklist(false);
   };
   // ---------------------------------------------
-  
+
   // Helper arrays for rendering the training display list
   const certificationMap: { key: TrainingBooleanKeys, label: string }[] = [
     { key: 'cpr', label: 'CPR' },
@@ -301,7 +309,7 @@ const ClientDashboardPage: React.FC = () => {
     { key: 'osha10', label: 'OSHA-10' },
     { key: 'nccer', label: 'NCCER' },
   ];
-  
+
   const cteProgramMap: { key: TrainingBooleanKeys, label: string }[] = [
     { key: 'constructionCTE', label: 'Construction CTE' },
     { key: 'cosmetologyCTE', label: 'Cosmetology CTE' },
@@ -348,7 +356,7 @@ const ClientDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-1 space-y-6">
-          <Card 
+          <Card
             title="Client Snapshot"
             titleAction={
                 <button
@@ -362,27 +370,27 @@ const ClientDashboardPage: React.FC = () => {
           >
             <div className="space-y-3">
               <div className="flex items-center text-gray-700">
-                <User className="h-5 w-5 mr-3 text-gray-400" /> 
+                <User className="h-5 w-5 mr-3 text-gray-400" />
                 <span>
                   {clientAge > 0 ? `Age ${clientAge} (DOB: ${profile.dob})` : (profile.dob ? `DOB: ${profile.dob}` : 'DOB not set')}
                 </span>
               </div>
               <div className="flex items-center text-gray-700">
-                <Phone className="h-5 w-5 mr-3 text-gray-400" /> 
+                <Phone className="h-5 w-5 mr-3 text-gray-400" />
                 <span>{contactInfo.phone || 'No phone'}</span>
               </div>
               {contactInfo.phone2 && (
                 <div className="flex items-center text-gray-700">
-                    <Phone className="h-5 w-5 mr-3 text-gray-400" /> 
+                    <Phone className="h-5 w-5 mr-3 text-gray-400" />
                     <span>{contactInfo.phone2} (secondary)</span>
                 </div>
               )}
               <div className="flex items-center text-gray-700">
-                <Mail className="h-5 w-5 mr-3 text-gray-400" /> 
+                <Mail className="h-5 w-5 mr-3 text-gray-400" />
                 <span>{contactInfo.email || 'No email'}</span>
               </div>
                <div className="flex items-start text-gray-700">
-                <Home className="h-5 w-5 mr-3 text-gray-400 flex-shrink-0 mt-1" /> 
+                <Home className="h-5 w-5 mr-3 text-gray-400 flex-shrink-0 mt-1" />
                 <span>{contactInfo.street ? `${contactInfo.street}${contactInfo.apt ? `, ${contactInfo.apt}` : ''}, ${contactInfo.city}, ${contactInfo.state} ${contactInfo.zip}` : 'No address'}</span>
               </div>
               {client.googleDriveLink && (
@@ -395,19 +403,19 @@ const ClientDashboardPage: React.FC = () => {
               )}
             </div>
           </Card>
-          
+
            <TasksSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />
            {/* --- Removed WorkshopsSection --- */}
         </div>
-        
+
         {/* Right Column (Tabs) */}
         <div className="lg:col-span-2">
             <div className="bg-[#E6E6E6] rounded-lg shadow-md border border-[#d1d1d1]">
                  <div className="border-b border-[#d1d1d1]">
                     <nav className="-mb-px flex space-x-6 px-6 overflow-x-auto" aria-label="Tabs">
                     {tabs.map(tab => (
-                        <button 
-                            key={tab} 
+                        <button
+                            key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                                 activeTab === tab
@@ -422,9 +430,9 @@ const ClientDashboardPage: React.FC = () => {
                 </div>
                 <div className="p-6">
                     {activeTab === 'Case Notes' && <CaseNotesSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />}
-                    
+
                     {activeTab === 'ISP' && <ISPSection client={client} isp={isp} onIspUpdate={handleIspUpdate} />}
-                    
+
                     {/* ----- NEW 'Audit Checklist' Tab Logic ----- */}
                     {activeTab === 'Audit Checklist' && auditChecklistData && (
                       <div>
@@ -440,15 +448,15 @@ const ClientDashboardPage: React.FC = () => {
                             </button>
                           ) : (
                             <div className="flex justify-end space-x-3">
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 onClick={handleAuditChecklistCancel}
                                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                               >
                                 Cancel
                               </button>
-                              <button 
-                                type="submit" 
+                              <button
+                                type="submit"
                                 onClick={handleAuditChecklistSave}
                                 disabled={isAuditChecklistSaving}
                                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
@@ -465,7 +473,7 @@ const ClientDashboardPage: React.FC = () => {
                           {(Object.keys(auditChecklistData) as Array<keyof AuditChecklist>).map(sectionKey => {
                             const items = auditChecklistData[sectionKey];
                             if (items.length === 0) return null;
-                            
+
                             return (
                               <fieldset key={sectionKey} className="border rounded-md">
                                 <legend className="text-md font-medium text-gray-700 px-2 py-1 bg-[#E6E6E6] ml-4 -mt-3 w-auto">
@@ -519,17 +527,17 @@ const ClientDashboardPage: React.FC = () => {
                                 Edit
                               </button>
                             </div>
-                            
+
                             <div className="space-y-4">
                               <div>
                                 <h4 className="text-md font-medium text-gray-800 mb-2">Certifications</h4>
                                 <div className="space-y-2">
                                   {certificationMap.filter(cert => trainingData[cert.key]).length > 0 ? (
-                                    certificationMap.map(cert => 
+                                    certificationMap.map(cert =>
                                       trainingData[cert.key] && <DisplayListItem key={cert.key} label={cert.label} />
                                     )
                                   ) : <p className="text-sm text-gray-500">No certifications on file.</p>}
-                                  
+
                                   {trainingData.otherCertificates && (
                                     <div className="pl-8 pt-1">
                                       <p className="text-sm text-gray-800 font-medium">Other: <span className="font-normal">{trainingData.otherCertificates}</span></p>
@@ -544,7 +552,7 @@ const ClientDashboardPage: React.FC = () => {
                                 <h4 className="text-md font-medium text-gray-800 mb-2">Enrolled CTE Programs</h4>
                                 <div className="space-y-2">
                                   {cteProgramMap.filter(cte => trainingData[cte.key]).length > 0 ? (
-                                    cteProgramMap.map(cte => 
+                                    cteProgramMap.map(cte =>
                                       trainingData[cte.key] && <DisplayListItem key={cte.key} label={cte.label} />
                                     )
                                   ) : <p className="text-sm text-gray-500">No CTE programs on file.</p>}
@@ -568,12 +576,13 @@ const ClientDashboardPage: React.FC = () => {
                                 <legend className="text-md font-medium text-gray-700 px-1">Certifications</legend>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                   {certificationMap.map(cert => (
-                                    <CheckboxInput 
-                                      key={cert.key} 
-                                      label={cert.label} 
+                                    <CheckboxInput
+                                      key={cert.key}
+                                      label={cert.label}
                                       name={cert.key}
-                                      checked={trainingData[cert.key]} 
-                                      onChange={handleTrainingChange} 
+                                      // --- FIX 2: Changed to Boolean cast ---
+                                      checked={Boolean(trainingData && trainingData[cert.key])}
+                                      onChange={handleTrainingChange}
                                     />
                                   ))}
                                 </div>
@@ -596,12 +605,13 @@ const ClientDashboardPage: React.FC = () => {
                                 <legend className="text-md font-medium text-gray-700 px-1">Enrolled CTE Programs</legend>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4">
                                   {cteProgramMap.map(cte => (
-                                    <CheckboxInput 
-                                      key={cte.key} 
-                                      label={cte.label} 
-                                      name={cte.key} 
-                                      checked={trainingData[cte.key]} 
-                                      onChange={handleTrainingChange} 
+                                    <CheckboxInput
+                                      key={cte.key}
+                                      label={cte.label}
+                                      name={cte.key}
+                                      // --- FIX 2: Changed to Boolean cast ---
+                                      checked={Boolean(trainingData && trainingData[cte.key])}
+                                      onChange={handleTrainingChange}
                                     />
                                   ))}
                                 </div>
@@ -621,15 +631,15 @@ const ClientDashboardPage: React.FC = () => {
 
                               {/* Save/Cancel Buttons */}
                               <div className="flex justify-end space-x-3">
-                                <button 
-                                  type="button" 
+                                <button
+                                  type="button"
                                   onClick={handleTrainingCancel}
                                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                                 >
                                   Cancel
                                 </button>
-                                <button 
-                                  type="submit" 
+                                <button
+                                  type="submit"
                                   disabled={isTrainingSaving}
                                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
                                 >

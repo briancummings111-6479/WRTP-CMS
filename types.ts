@@ -184,7 +184,8 @@ export interface Workshop {
   id:string;
   clientId: string;
   workshopDate: number; // Timestamp
-  workshopName: 'Career Explorations' | 'Job Preparedness' | 'Interview Success' | 'Financial Literacy' | 'Entrepreneurship' | 'Other';
+  // --- FIX: Added 'Resume Building' to the type ---
+  workshopName: 'Career Explorations' | 'Job Preparedness' | 'Interview Success' | 'Financial Literacy' | 'Entrepreneurship' | 'Resume Building' | 'Other';
   workshopNameOther?: string;
   status: 'Scheduled' | 'Declined' | 'Completed' | 'No Show';
   assignedToId: string; // UID of staff
