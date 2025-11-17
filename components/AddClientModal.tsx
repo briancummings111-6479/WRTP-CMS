@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Client, AuditChecklist } from '../types'; // Import new type
 import { X } from 'lucide-react';
-import api from '../services/mockApi';
+import api from '../src/lib/firebase'; // <-- CORRECTED PATH: ../src/lib/firebase
 import { useAuth } from '../context/AuthContext';
 
 interface AddClientModalProps {
