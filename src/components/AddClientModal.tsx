@@ -1,49 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { Client, AuditChecklist } from '../types'; // Import new type
 import { X } from 'lucide-react';
-import api from '../src/lib/firebase'; // <-- CORRECTED PATH: ../src/lib/firebase
+import api from '../lib/firebase'; // <-- CORRECTED PATH: ../lib/firebase
 import { useAuth } from '../context/AuthContext';
 
 interface AddClientModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (newClient: Client) => void;
-  admins: { id: string, name: string }[];
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (newClient: Client) => void;
+    admins: { id: string, name: string }[];
 }
 
 // --- NEW Initial data for Audit Checklist ---
 const initialAuditChecklist: AuditChecklist = {
-  onboarding: [
-    { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  isp: [
-    { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  caseNotes: [
-    { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  workshops: [
-    { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
-    { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
-  ],
-  misc: [
-    // Per the CSV, this section is empty
-  ]
+    onboarding: [
+        { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
+    ],
+    isp: [
+        { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
+    ],
+    caseNotes: [
+        { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
+    ],
+    workshops: [
+        { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
+        { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
+    ],
+    misc: [
+        // Per the CSV, this section is empty
+    ]
 };
 // ----------------------------------------
 
@@ -65,7 +65,7 @@ const initialFormData = {
     },
     referralSource: '',
     googleDriveLink: '',
-    
+
     // --- REPLACED caseManagement ---
     auditChecklist: initialAuditChecklist,
     // -------------------------------
@@ -94,7 +94,7 @@ const initialFormData = {
     },
 };
 
-const CheckboxInput = ({ label, name, checked, onChange }: { label: string, name: string, checked: boolean, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void}) => (
+const CheckboxInput = ({ label, name, checked, onChange }: { label: string, name: string, checked: boolean, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
     <label className="flex items-center">
         <input type="checkbox" name={name} checked={checked} onChange={onChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
         <span className="ml-2 text-gray-700">{label}</span>
@@ -115,7 +115,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                 metadata: {
                     ...prev.metadata,
                     // Default to "Unassigned"
-                    assignedAdminId: '', 
+                    assignedAdminId: '',
                     assignedAdminName: '',
                 }
             }));
@@ -129,7 +129,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
-        
+
         if (name.includes('.')) {
             const [section, field] = name.split('.');
             setFormData((prev: any) => ({
@@ -140,7 +140,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                 }
             }));
         } else {
-             setFormData((prev: any) => ({
+            setFormData((prev: any) => ({
                 ...prev,
                 [name]: value
             }));
@@ -193,19 +193,19 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                         {/* Profile Section */}
                         <fieldset className="space-y-4 p-4 border border-[#d1d1d1] rounded-md">
                             <legend className="text-lg font-medium text-gray-700 px-1">Profile</legend>
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">First Name</label><input type="text" name="profile.firstName" value={formData.profile.firstName} onChange={handleInputChange} className="form-input" required /></div>
                                 <div><label className="label">Last Name</label><input type="text" name="profile.lastName" value={formData.profile.lastName} onChange={handleInputChange} className="form-input" required /></div>
                                 {/* Removed 'required' from DOB */}
                                 <div><label className="label">Date of Birth</label><input type="date" name="profile.dob" value={formData.profile.dob} onChange={handleInputChange} className="form-input" /></div>
                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">Phone</label><input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone} onChange={handleInputChange} className="form-input" /></div>
                                 <div><label className="label">Second Phone</label><input type="tel" name="contactInfo.phone2" value={formData.contactInfo.phone2} onChange={handleInputChange} className="form-input" /></div>
                                 {/* Removed 'required' from Email */}
                                 <div><label className="label">Email</label><input type="email" name="contactInfo.email" value={formData.contactInfo.email} onChange={handleInputChange} className="form-input" /></div>
                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                 <div className="md:col-span-2"><label className="label">Street Address</label><input type="text" name="contactInfo.street" value={formData.contactInfo.street} onChange={handleInputChange} className="form-input" /></div>
                                 <div><label className="label">Apt/Unit #</label><input type="text" name="contactInfo.apt" value={formData.contactInfo.apt} onChange={handleInputChange} className="form-input" /></div>
                                 <div className="md:col-span-2"><label className="label">City</label><input type="text" name="contactInfo.city" value={formData.contactInfo.city} onChange={handleInputChange} className="form-input" /></div>
@@ -229,9 +229,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                             </div>
                             {/* --- REMOVED old caseManagement checkboxes --- */}
                         </fieldset>
-                        
+
                         {/* --- DELETED: Training Section was here --- */}
-                        
+
                     </div>
                     <div className="flex justify-end items-center p-4 border-t border-[#d1d1d1] bg-[#f2f2f2] sticky bottom-0">
                         <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 mr-3">Cancel</button>

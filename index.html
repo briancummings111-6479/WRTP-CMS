@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WRTP Case Management System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WRTP Case Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script type="importmap">
 {
   "imports": {
@@ -17,27 +18,32 @@
   }
 }
 </script>
-<style>
-  @media print {
-    body {
+  <style>
+    @media print {
+      body {
         background-color: white !important;
-    }
-    main {
+      }
+
+      main {
         padding: 0 !important;
         overflow-y: visible !important;
-    }
-    .printable-card {
+      }
+
+      .printable-card {
         box-shadow: none !important;
         border: none !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
     }
-    .no-print {
-      display: none !important;
-    }
-  }
-</style>
+  </style>
 </head>
-  <body class="bg-[#BAC8B1]">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-[#BAC8B1]">
+  <div id="root"></div>
+  <script type="module" src="/src/index.tsx"></script>
+</body>
+
 </html>

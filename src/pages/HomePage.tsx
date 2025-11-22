@@ -1,56 +1,48 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../src/lib/firebase'; // Corrected path
-import { Client, Task, CaseNote } from '../types';
-import { useAuth } from '../context/AuthContext';
-import { Search, User, Calendar, ArrowRight, Plus, Flame, AlertTriangle, Circle } from 'lucide-react';
-import Card from '../components/Card';
-import AddClientModal from '../components/AddClientModal';
 
 const UrgencyBadge: React.FC<{ urgency: Task['urgency'] }> = ({ urgency }) => {
-    const urgencyConfig = {
-        Green: {
-            styles: 'bg-green-100 text-green-800',
-            icon: <Circle className="h-3 w-3 mr-1.5" />,
-            text: 'Normal'
-        },
-        Yellow: {
-            styles: 'bg-yellow-100 text-yellow-800',
-            icon: <AlertTriangle className="h-3 w-3 mr-1.5" />,
-            text: 'Medium'
-        },
-        Red: {
-            styles: 'bg-red-100 text-red-800',
-            icon: <Flame className="h-3 w-3 mr-1.5" />,
-            text: 'High'
-        },
-    };
-    const config = urgencyConfig[urgency];
-    return (
-        <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${config.styles}`}>
-            {config.icon}
-            {config.text}
-        </span>
-    );
+  const urgencyConfig = {
+    Green: {
+      styles: 'bg-green-100 text-green-800',
+      icon: <Circle className="h-3 w-3 mr-1.5" />,
+      text: 'Normal'
+    },
+    Yellow: {
+      styles: 'bg-yellow-100 text-yellow-800',
+      icon: <AlertTriangle className="h-3 w-3 mr-1.5" />,
+      text: 'Medium'
+    },
+    Red: {
+      styles: 'bg-red-100 text-red-800',
+      icon: <Flame className="h-3 w-3 mr-1.5" />,
+      text: 'High'
+    },
+  };
+  const config = urgencyConfig[urgency];
+  return (
+    <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${config.styles}`}>
+      {config.icon}
+      {config.text}
+    </span>
+  );
 };
 
 const TaskStatusBadge: React.FC<{ status: Task['status'] }> = ({ status }) => {
-    const styles = {
-        'Open': 'bg-blue-100 text-blue-800',
-        'In Progress': 'bg-yellow-100 text-yellow-800',
-        'Waiting': 'bg-gray-100 text-gray-800',
-        'Completed': 'bg-green-100 text-green-800',
-    };
-    return <span className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${styles[status]}`}>{status}</span>
+  const styles = {
+    'Open': 'bg-blue-100 text-blue-800',
+    'In Progress': 'bg-yellow-100 text-yellow-800',
+    'Waiting': 'bg-gray-100 text-gray-800',
+    'Completed': 'bg-green-100 text-green-800',
+  };
+  return <span className={`px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${styles[status]}`}>{status}</span>
 };
 
 const ClientStatusBadge: React.FC<{ status: Client['metadata']['status'] }> = ({ status }) => {
-    const styles = {
-        'Prospect': 'bg-blue-100 text-blue-800',
-        'Active': 'bg-green-100 text-green-800',
-        'Inactive': 'bg-yellow-100 text-yellow-800',
-    };
-    return <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${styles[status]}`}>{status}</span>
+  const styles = {
+    'Prospect': 'bg-blue-100 text-blue-800',
+    'Active': 'bg-green-100 text-green-800',
+    'Inactive': 'bg-yellow-100 text-yellow-800',
+  };
+  return <span className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full ${styles[status]}`}>{status}</span>
 };
 
 
@@ -78,7 +70,7 @@ const HomePage: React.FC = () => {
     return () => unsubscribe();
   }, []); // Empty dependency array means this runs once on mount
   // --------------------------------------------------------
-  
+
   // This fetch for Admins and Tasks can remain the same for now
   useEffect(() => {
     const fetchAdminsAndTasks = async () => {
@@ -90,7 +82,7 @@ const HomePage: React.FC = () => {
             api.getTasksByClientId('all') // This will use the placeholder in firebase.ts
           ]);
           setAdmins(adminsData || []);
-          
+
           // Filter tasks for the current user
           const userTasks = (tasksData || []).filter(
             (task: Task) => task.assignedToId === user.uid && task.status !== 'Completed'
@@ -142,18 +134,18 @@ const HomePage: React.FC = () => {
         {/* Client List */}
         <Card>
           <div className="p-4 border-b border-gray-200">
-              <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                      type="text"
-                      placeholder="Search by name, phone, or case manager..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm"
-                  />
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
+              <input
+                type="text"
+                placeholder="Search by name, phone, or case manager..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm"
+              />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -182,7 +174,7 @@ const HomePage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.metadata.assignedAdminName || 'Unassigned'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                          <ClientStatusBadge status={client.metadata.status} />
+                        <ClientStatusBadge status={client.metadata.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <ArrowRight className="h-5 w-5 text-gray-400" />
@@ -209,22 +201,22 @@ const HomePage: React.FC = () => {
                 {/* This task logic will fail until we migrate tasks, but won't crash */}
                 {tasks.map(task => (
                   <div key={task.id} className="p-3 bg-white rounded-md border border-gray-200 hover:border-gray-300 group">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p onClick={() => navigate(`/clients/${task.clientId}`)} className="text-sm font-medium text-gray-800 hover:underline cursor-pointer group-hover:text-[#404E3B]">{task.title}</p>
-                          <p className="text-sm text-gray-500 flex items-center mt-1"><User className="h-4 w-4 mr-1.5"/>{task.clientName}</p>
-                        </div>
-                         <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-[#404E3B] transition-transform transform group-hover:translate-x-1 ml-2 flex-shrink-0" />
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p onClick={() => navigate(`/clients/${task.clientId}`)} className="text-sm font-medium text-gray-800 hover:underline cursor-pointer group-hover:text-[#404E3B]">{task.title}</p>
+                        <p className="text-sm text-gray-500 flex items-center mt-1"><User className="h-4 w-4 mr-1.5" />{task.clientName}</p>
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                          <p className="text-xs text-red-600 flex items-center"><Calendar className="h-4 w-4 mr-1.5"/>Due: {new Date(task.dueDate).toLocaleDateString()}</p>
-                          <div className="flex items-center space-x-2">
-                              <TaskStatusBadge status={task.status} />
-                              <UrgencyBadge urgency={task.urgency} />
-                          </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-[#404E3B] transition-transform transform group-hover:translate-x-1 ml-2 flex-shrink-0" />
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <p className="text-xs text-red-600 flex items-center"><Calendar className="h-4 w-4 mr-1.5" />Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                      <div className="flex items-center space-x-2">
+                        <TaskStatusBadge status={task.status} />
+                        <UrgencyBadge urgency={task.urgency} />
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
                 {tasks.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No open tasks assigned to you.</p>}
               </div>
             </Card>
@@ -234,10 +226,10 @@ const HomePage: React.FC = () => {
       {/* --- STEP 3: Admin role check RESTORED --- */}
       {user?.role === 'admin' && (
         <AddClientModal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
-            onSave={handleSaveNewClient}
-            admins={admins}
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onSave={handleSaveNewClient}
+          admins={admins}
         />
       )}
       {/* ------------------------------------------- */}

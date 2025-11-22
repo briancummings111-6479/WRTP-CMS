@@ -9,7 +9,7 @@ import DataExportPage from './pages/DataExportPage';
 import AdminRoute from './components/AdminRoute';
 import KioskIntakePage from './pages/KioskIntakePage';
 import DataImportPage from './pages/DataImportPage';
-import { initializeAuth } from './src/lib/firebase'; // <-- CORRECTED PATH: ./src/lib/firebase
+import { initializeAuth } from './lib/firebase'; // <-- CORRECTED PATH: ./lib/firebase
 
 function App() {
 
@@ -35,26 +35,26 @@ function App() {
         <Routes>
           {/* Public Kiosk Route */}
           <Route path="/kiosk" element={<KioskIntakePage />} />
-          
+
           {/* Authenticated Routes */}
           <Route path="/" element={<Layout><HomePage /></Layout>} />
           <Route path="/clients/:clientId" element={<Layout><ClientDashboardPage /></Layout>} />
           <Route path="/reports" element={<Layout><ReportsPage /></Layout>} />
-          <Route 
-            path="/export" 
+          <Route
+            path="/export"
             element={
               <AdminRoute>
                 <Layout><DataExportPage /></Layout>
               </AdminRoute>
-            } 
+            }
           />
-          <Route 
-            path="/import" 
+          <Route
+            path="/import"
             element={
               <AdminRoute>
                 <Layout><DataImportPage /></Layout>
               </AdminRoute>
-            } 
+            }
           />
         </Routes>
       </HashRouter>
