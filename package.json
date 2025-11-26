@@ -10,20 +10,31 @@
   },
   "dependencies": {
     "firebase": "^10.12.0",
-    "lucide-react": "^0.378.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.23.0",
-    "recharts": "^2.12.7"
-  },
-  "devDependencies": {
-    "@types/node": "^20.12.12",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.4.5",
-    "vite": "^5.2.11"
-  }
-},
-"engines": {
-  "node": ">=18.0.0"
-}
-}
+    {
+      "name": "wrtp-cms",
+      "private": true,
+      "version": "0.0.0",
+      "type": "module",
+      "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+      },
+      "dependencies": {
+        "firebase": "^10.12.0",
+        "lucide-react": "^0.378.0",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^6.23.0",
+        "recharts": "^2.12.7"
+      },
+      "devDependencies": {
+        "@types/node": "^20.12.12",
+        "@vitejs/plugin-react": "^4.2.1",
+        "typescript": "^5.4.5",
+        "vite": "^5.2.11"
+      },
+      "engines": {
+        "node": ">=18.0.0"
+      }
+    }
