@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../services/mockApi';
-import { ISP, Client, PlanOfActionItem, SupportServiceReferral } from '../../types';
+import React, { useState, useEffect } from 'react';
+import api from '../../lib/firebase';
+import { ISP, Client } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../Card';
 import { CheckSquare, Edit, Square, Printer, Plus, Trash2 } from 'lucide-react';
@@ -18,7 +18,8 @@ const barrierOptions = [
     "Substance Use", "Transportation", "Criminal Background/Court", "Other"
 ];
 
-const defaultISPForm: Omit<ISP, 'id' | 'clientId' | 'ispDate'> = {
+const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
+    ispDate: Date.now(),
     jobDeveloper: '',
     acknowledgmentInitialed: false,
     shortTermGoals: '',
@@ -62,7 +63,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         const [parent, child] = name.split('.');
         setFormData(prev => ({ ...prev, [parent]: { ...(prev as any)[parent], [child]: value } }));
     };
-    
+
     const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, checked } = e.target;
         setFormData(prev => ({ ...prev, [name]: checked }));
@@ -90,7 +91,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
     };
 
     const addDynamicListItem = (listName: 'planOfAction' | 'supportServices') => {
-        const newItem = listName === 'planOfAction' 
+        const newItem = listName === 'planOfAction'
             ? { id: crypto.randomUUID(), goal: '', action: '', responsibleParty: '', targetDate: '', reviewDate: '', completionDate: '' }
             : { id: crypto.randomUUID(), agency: '', referralDate: '', outcome: '' };
         setFormData(prev => ({ ...prev, [listName]: [...(prev[listName] as any[] || []), newItem] }));
@@ -103,25 +104,31 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        const dataToSave = { ...formData, clientId, ispDate: formData.ispDate || Date.now() } as ISP;
+        // Ensure ID is present for new ISPs
+        const dataToSave = {
+            ...formData,
+            clientId,
+            ispDate: formData.ispDate || Date.now(),
+            id: isp?.id || crypto.randomUUID()
+        } as ISP;
+
         try {
             await onIspUpdate(dataToSave);
             setIsEditing(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to save ISP:", error);
-            alert("Error saving ISP.");
+            alert(`Error saving ISP: ${error.message || error}`);
         } finally {
             setIsSaving(false);
         }
     };
-    
+
     const generateISPPrintHTML = () => {
         if (!isp) return '';
         const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString();
         const fieldStyle = "border-b border-gray-600 flex-grow min-w-0";
         const rowStyle = "flex items-end space-x-2 mb-2";
         const labelStyle = "font-semibold whitespace-nowrap";
-        const valueStyle = "pl-2 text-gray-700";
 
         const barriersHTML = barrierOptions.map(b => `
             <div class="flex items-center">
@@ -139,15 +146,15 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 <td class="p-1 border-r">${item.reviewDate || '&nbsp;'}</td>
                 <td class="p-1">${item.completionDate || '&nbsp;'}</td>
             </tr>
-        `).join('') + Array(5 - (isp.planOfAction || []).length).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
-        
+        `).join('') + Array(Math.max(0, 5 - (isp.planOfAction || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
+
         const supportServicesHTML = (isp.supportServices || []).map(item => `
              <tr class="border-b">
                 <td class="p-1 border-r">${item.agency || '&nbsp;'}</td>
                 <td class="p-1 border-r">${item.referralDate || '&nbsp;'}</td>
                 <td class="p-1">${item.outcome || '&nbsp;'}</td>
             </tr>
-        `).join('') + Array(3 - (isp.supportServices || []).length).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
+        `).join('') + Array(Math.max(0, 3 - (isp.supportServices || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
 
         return `
             <html>
@@ -238,7 +245,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         const printContent = generateISPPrintHTML();
         if (printContent) {
             const printWindow = window.open('', '_blank');
-            if(printWindow) {
+            if (printWindow) {
                 printWindow.document.write(printContent);
                 printWindow.document.close();
                 setTimeout(() => {
@@ -248,90 +255,73 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
             }
         }
     };
-    
+
     if (isEditing) {
         return (
             <Card title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"}>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* FIX: Replaced class with className */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* FIX: Replaced class with className */}
+                        <div>
+                            <label htmlFor="ispDate" className="label">ISP Date</label>
+                            <input
+                                type="date"
+                                id="ispDate"
+                                name="ispDate"
+                                value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
+                                className="form-input"
+                            />
+                        </div>
                         <div><label htmlFor="jobDeveloper" className="label">Job Developer</label><input type="text" id="jobDeveloper" name="jobDeveloper" value={formData.jobDeveloper || ''} onChange={handleInputChange} className="form-input" /></div>
                     </div>
 
-                    {/* FIX: Replaced class with className */}
                     <fieldset><legend className="legend">Goals</legend>
-                        {/* FIX: Replaced class with className */}
                         <div><label htmlFor="shortTermGoals" className="label">How can WRTP be of service to you? (1–3 month goals)</label><textarea id="shortTermGoals" name="shortTermGoals" value={formData.shortTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
-                        {/* FIX: Replaced class with className */}
                         <div><label htmlFor="longTermGoals" className="label">Long-Term Goals (6−12+ months)</label><textarea id="longTermGoals" name="longTermGoals" value={formData.longTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
                     </fieldset>
 
-                    {/* FIX: Replaced class with className */}
                     <fieldset><legend className="legend">Identified Barriers/Needs</legend>
-                         {/* FIX: Replaced class with className */}
-                         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox"/><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
                     </fieldset>
 
-                    {/* FIX: Replaced class with className */}
                     <fieldset><legend className="legend">Career Planning</legend>
-                         {/* FIX: Replaced class with className */}
-                         <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
-                         {/* FIX: Replaced class with className */}
-                         <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox"/><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
+                        <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
+                        <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
                     </fieldset>
-                    
-                    {/* FIX: Replaced class with className */}
+
                     <fieldset><legend className="legend">Plan of Action - Who will do what and when?</legend>
                         {(formData.planOfAction || []).map((item, index) => (
-                            // FIX: Replaced class with className
                             <div key={item.id} className="p-2 border rounded-md space-y-2 mb-2">
-                                {/* FIX: Replaced class with className */}
                                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                                    <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2"/>
-                                    <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2"/>
-                                    <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input"/>
+                                    <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                    <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                    <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input" />
                                 </div>
-                                {/* FIX: Replaced class with className */}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                                    {/* FIX: Replaced class with className */}
-                                    <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input"/></div>
-                                    {/* FIX: Replaced class with className */}
-                                    <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input"/></div>
-                                    {/* FIX: Replaced class with className */}
-                                    <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input"/></div>
-                                    {/* FIX: Replaced class with className */}
-                                    <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5"/></button>
+                                    <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input" /></div>
+                                    <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input" /></div>
+                                    <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input" /></div>
+                                    <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5" /></button>
                                 </div>
                             </div>
                         ))}
-                        {/* FIX: Replaced class with className */}
-                        <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1"/>Add Action Item</button>
+                        <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Action Item</button>
                     </fieldset>
 
-                     {/* FIX: Replaced class with className */}
-                     <fieldset><legend className="legend">Support Services</legend>
+                    <fieldset><legend className="legend">Support Services</legend>
                         {(formData.supportServices || []).map((item, index) => (
-                             // FIX: Replaced class with className
-                             <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
-                                {/* FIX: Replaced class with className */}
-                                <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2"/>
-                                {/* FIX: Replaced class with className */}
-                                <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input"/></div>
-                                {/* FIX: Replaced class with className */}
-                                <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3"/>
-                                {/* FIX: Replaced class with className */}
-                                <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5"/></button>
+                            <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
+                                <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2" />
+                                <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input" /></div>
+                                <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3" />
+                                <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5" /></button>
                             </div>
                         ))}
-                        {/* FIX: Replaced class with className */}
-                        <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1"/>Add Referral</button>
+                        <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Referral</button>
                     </fieldset>
-                    
-                    {/* FIX: Replaced class with className */}
-                    <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox"/><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
-                    
-                    {/* FIX: Replaced class with className */}
+
+                    <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox" /><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
+
                     <div className="flex justify-end pt-4 border-t"><button type="button" onClick={handleCancel} className="btn-secondary">Cancel</button><button type="submit" disabled={isSaving} className="btn-primary ml-3">{isSaving ? 'Saving...' : 'Save ISP'}</button></div>
                 </form>
                 <style>{`
@@ -347,10 +337,9 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 `}</style>
             </Card>
         );
-    } 
+    }
 
     if (!isp) {
-        // FIX: Replaced class with className
         return <div className="text-center py-10"><p className="text-gray-500 mb-4">No Individual Service Plan found for this client.</p>{user?.role === 'admin' && <button onClick={handleEdit} className="btn-primary">Create ISP</button>}</div>;
     }
 
@@ -360,44 +349,36 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
             <tbody className="divide-y">{data.map(renderRow)}</tbody>
         </table></div>
     );
-    
+
     return (
         <div className="space-y-6">
             <Card title="Individual Service Plan" titleAction={
                 <div className="flex items-center space-x-2 no-print">
                     <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>
                     {user?.role === 'admin' && <button onClick={handleEdit} className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-[#404E3B] bg-[#E6E6E6] hover:bg-[#f2f2f2]"><Edit className="h-4 w-4 mr-2" />Edit ISP</button>}
-               </div>
-           }>
-               <div className="space-y-6">
+                </div>
+            }>
+                <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* FIX: Replaced class with className */}
                         <div><h4 className="font-semibold">ISP Date</h4><p>{new Date(isp.ispDate).toLocaleDateString()}</p></div>
-                        {/* FIX: Replaced class with className */}
                         <div><h4 className="font-semibold">Job Developer</h4><p>{isp.jobDeveloper || 'N/A'}</p></div>
                     </div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Short-Term Goals (1-3 months)</h4><p className="whitespace-pre-wrap">{isp.shortTermGoals || 'N/A'}</p></div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Long-Term Goals (6-12+ months)</h4><p className="whitespace-pre-wrap">{isp.longTermGoals || 'N/A'}</p></div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Identified Barriers</h4>{isp.identifiedBarriers.length > 0 ? <ul className="list-disc list-inside"> {isp.identifiedBarriers.map(b => <li key={b}>{b}</li>)}</ul> : <p>No barriers identified.</p>}</div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Career Planning</h4><p>Workshops: {isp.careerPlanning.workshopsAssigned || 'None'}</p><p>Enrolled in CTE/College: {isp.careerPlanning.enrolledInCteOrCollege ? 'Yes' : 'No'}</p></div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Plan of Action</h4>
+                    <div><h4 className="font-semibold">Short-Term Goals (1-3 months)</h4><p className="whitespace-pre-wrap">{isp.shortTermGoals || 'N/A'}</p></div>
+                    <div><h4 className="font-semibold">Long-Term Goals (6-12+ months)</h4><p className="whitespace-pre-wrap">{isp.longTermGoals || 'N/A'}</p></div>
+                    <div><h4 className="font-semibold">Identified Barriers</h4>{isp.identifiedBarriers.length > 0 ? <ul className="list-disc list-inside"> {isp.identifiedBarriers.map(b => <li key={b}>{b}</li>)}</ul> : <p>No barriers identified.</p>}</div>
+                    <div><h4 className="font-semibold">Career Planning</h4><p>Workshops: {isp.careerPlanning.workshopsAssigned || 'None'}</p><p>Enrolled in CTE/College: {isp.careerPlanning.enrolledInCteOrCollege ? 'Yes' : 'No'}</p></div>
+                    <div><h4 className="font-semibold">Plan of Action</h4>
                         <TableView headers={['Goal', 'Action', 'Responsible Party', 'Target Date', 'Review Date', 'Completion Date']} data={isp.planOfAction || []}
                             renderRow={item => <tr key={item.id}><td className="p-2">{item.goal}</td><td className="p-2">{item.action}</td><td className="p-2">{item.responsibleParty}</td><td className="p-2">{item.targetDate}</td><td className="p-2">{item.reviewDate}</td><td className="p-2">{item.completionDate}</td></tr>} />
-                   </div>
-                   {/* FIX: Replaced class with className */}
-                   <div><h4 className="font-semibold">Support Services</h4>
+                    </div>
+                    <div><h4 className="font-semibold">Support Services</h4>
                         <TableView headers={['Agency', 'Referral Date', 'Outcome']} data={isp.supportServices || []}
                             renderRow={item => <tr key={item.id}><td className="p-2">{item.agency}</td><td className="p-2">{item.referralDate}</td><td className="p-2">{item.outcome}</td></tr>} />
-                   </div>
-                   <div className="flex items-center pt-4 border-t">{isp.acknowledgmentInitialed ? <CheckSquare className="h-5 w-5 text-green-600 mr-2" /> : <Square className="h-5 w-5 text-gray-400 mr-2" />}<span className="font-medium">Client has acknowledged this ISP.</span></div>
-               </div>
-           </Card>
-           <AttachmentsSection clientId={clientId} showList={false} />
+                    </div>
+                    <div className="flex items-center pt-4 border-t">{isp.acknowledgmentInitialed ? <CheckSquare className="h-5 w-5 text-green-600 mr-2" /> : <Square className="h-5 w-5 text-gray-400 mr-2" />}<span className="font-medium">Client has acknowledged this ISP.</span></div>
+                </div>
+            </Card>
+            <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
         </div>
     );
 };

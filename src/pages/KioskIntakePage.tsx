@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import api from '../services/mockApi';
+import api from '../lib/firebase';
 import { ClipboardList } from 'lucide-react';
 
 const KioskIntakePage: React.FC = () => {
@@ -41,7 +41,7 @@ const KioskIntakePage: React.FC = () => {
             }
         });
     };
-    
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
@@ -49,7 +49,7 @@ const KioskIntakePage: React.FC = () => {
         if (formData.otherBarrier) {
             finalData.barriers.push(`Other: ${formData.otherBarrier}`);
         }
-        
+
         try {
             await api.submitIntakeForm(finalData);
             setSubmitted(true);
@@ -64,11 +64,11 @@ const KioskIntakePage: React.FC = () => {
     if (submitted) {
         return (
             <div className="min-h-screen bg-[#BAC8B1] flex flex-col justify-center items-center p-4">
-                 <div className="max-w-2xl w-full bg-white p-8 md:p-12 rounded-xl shadow-lg text-center">
+                <div className="max-w-2xl w-full bg-white p-8 md:p-12 rounded-xl shadow-lg text-center">
                     <ClipboardList className="h-16 w-16 text-green-500 mx-auto mb-4" />
                     <h1 className="text-3xl font-bold text-gray-800 mb-2">Thank You!</h1>
                     <p className="text-gray-600 text-lg">Your information has been submitted successfully. A staff member will be in contact with you soon.</p>
-                 </div>
+                </div>
             </div>
         )
     }
@@ -83,14 +83,14 @@ const KioskIntakePage: React.FC = () => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <input name="firstName" placeholder="First Name" onChange={handleInputChange} required className="form-input"/>
-                        <input name="lastName" placeholder="Last Name" onChange={handleInputChange} required className="form-input"/>
+                        <input name="firstName" placeholder="First Name" onChange={handleInputChange} required className="form-input" />
+                        <input name="lastName" placeholder="Last Name" onChange={handleInputChange} required className="form-input" />
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <input name="age" type="number" placeholder="Age" onChange={handleInputChange} required className="form-input"/>
-                        <input name="phone" type="tel" placeholder="Phone Number" onChange={handleInputChange} required className="form-input"/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <input name="age" type="number" placeholder="Age" onChange={handleInputChange} required className="form-input" />
+                        <input name="phone" type="tel" placeholder="Phone Number" onChange={handleInputChange} required className="form-input" />
                     </div>
-                    <input name="email" type="email" placeholder="Email Address" onChange={handleInputChange} required className="form-input"/>
+                    <input name="email" type="email" placeholder="Email Address" onChange={handleInputChange} required className="form-input" />
                     <select name="bestTimeToReach" onChange={handleInputChange} required className="form-input">
                         <option value="">Best time to reach you?</option>
                         <option>Mornings</option>
@@ -103,18 +103,18 @@ const KioskIntakePage: React.FC = () => {
                         <div className="space-y-2">
                             {barriersOptions.map(option => (
                                 <label key={option} className="flex items-center">
-                                    <input type="checkbox" value={option} onChange={handleCheckboxChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]"/>
+                                    <input type="checkbox" value={option} onChange={handleCheckboxChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
                                     <span className="ml-2 text-gray-700">{option}</span>
                                 </label>
                             ))}
                             <label className="flex items-center">
-                                <input type="checkbox" name="other" className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]"/>
+                                <input type="checkbox" name="other" className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
                                 <span className="ml-2 text-gray-700">Other:</span>
                             </label>
                             <input name="otherBarrier" onChange={handleInputChange} placeholder="Please specify" className="form-input mt-1 w-full" />
                         </div>
                     </div>
-                    <input name="howDidYouHear" placeholder="How did you hear about us?" onChange={handleInputChange} className="form-input"/>
+                    <input name="howDidYouHear" placeholder="How did you hear about us?" onChange={handleInputChange} className="form-input" />
 
                     <button type="submit" disabled={submitting} className="w-full bg-[#404E3B] text-white py-3 rounded-lg font-semibold text-lg hover:bg-[#5a6c53] disabled:bg-[#8d9b89] transition-colors">
                         {submitting ? 'Submitting...' : 'Submit Information'}

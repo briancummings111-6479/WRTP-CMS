@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Client, AuditChecklist } from '../types'; // Import new type
+import { Client, AuditChecklist, User as AppUser } from '../types';
 import { X } from 'lucide-react';
-import api from '../lib/firebase'; // <-- CORRECTED PATH: ../lib/firebase
+import api from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface AddClientModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (newClient: Client) => void;
-    admins: { id: string, name: string }[];
+    staff: AppUser[];
 }
 
 // --- NEW Initial data for Audit Checklist ---
@@ -102,14 +102,14 @@ const CheckboxInput = ({ label, name, checked, onChange }: { label: string, name
 );
 
 
-const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave, admins }) => {
+const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave, staff }) => {
     const [formData, setFormData] = useState<any>(initialFormData);
     const [isSaving, setIsSaving] = useState(false);
     const { user } = useAuth();
 
     useEffect(() => {
         // Set a default admin if one isn't selected, but it's no longer required
-        if (isOpen && admins.length > 0 && !formData.metadata.assignedAdminId) {
+        if (isOpen && staff.length > 0 && !formData.metadata.assignedAdminId) {
             setFormData((prev: any) => ({
                 ...prev,
                 metadata: {
@@ -124,7 +124,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         if (!isOpen) {
             setFormData(initialFormData);
         }
-    }, [isOpen, admins]);
+    }, [isOpen, staff]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -152,9 +152,9 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         setFormData((prev: any) => {
             const newMetadata = { ...prev.metadata };
             if (name === 'assignedAdminId') {
-                const selectedAdmin = admins.find(a => a.id === value);
+                const selectedStaff = staff.find(s => s.uid === value);
                 newMetadata.assignedAdminId = value;
-                newMetadata.assignedAdminName = selectedAdmin?.name || '';
+                newMetadata.assignedAdminName = selectedStaff?.name || '';
             } else {
                 (newMetadata as any)[name] = value;
             }
@@ -225,7 +225,17 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                 <div><label className="label">Client Status</label><select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input"><option value="Prospect">Prospect</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
                                 {/* Removed 'required' from Assigned Case Manager */}
-                                <div><label className="label">Assigned Case Manager</label><select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input"><option value="">Unassigned</option>{admins.map(admin => (<option key={admin.id} value={admin.id}>{admin.name}</option>))}</select></div>
+                                <div>
+                                    <label className="label">Assigned Case Manager</label>
+                                    <select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input">
+                                        <option value="">Unassigned</option>
+                                        {staff.map(s => (
+                                            <option key={s.uid} value={s.uid}>
+                                                {s.name} {s.title ? `(${s.title})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             {/* --- REMOVED old caseManagement checkboxes --- */}
                         </fieldset>

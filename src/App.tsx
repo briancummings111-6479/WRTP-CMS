@@ -1,45 +1,95 @@
-import React, { useEffect } from 'react'; // Added useEffect
-import { HashRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import React from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import ClientDashboardPage from './pages/ClientDashboardPage';
 import ReportsPage from './pages/ReportsPage';
 import DataExportPage from './pages/DataExportPage';
-import AdminRoute from './components/AdminRoute';
 import KioskIntakePage from './pages/KioskIntakePage';
 import DataImportPage from './pages/DataImportPage';
-import { initializeAuth } from './lib/firebase'; // <-- CORRECTED PATH: ./lib/firebase
+import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import SignUpPage from './pages/SignUpPage';
+import PendingApprovalPage from './pages/PendingApprovalPage';
+import UsersPage from './pages/UsersPage';
+
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    console.log("ProtectedRoute: No user, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+
+  console.log("ProtectedRoute: User role:", user.role);
+
+  // Redirect pending users to the pending approval page
+  if (user.role === 'pending') {
+    return <Navigate to="/pending-approval" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Admin Route Component
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 function App() {
-
-  // Added this hook to initialize Firebase on app load
-  useEffect(() => {
-    // This function will handle sign-in (anonymous or custom token)
-    // We will add this function to firebase.js in the next step.
-    const unsubscribe = initializeAuth((user) => {
-      if (user) {
-        console.log("Firebase Auth initialized, user:", user.uid);
-      } else {
-        console.log("Firebase Auth initialized, no user.");
-      }
-    });
-
-    // Cleanup listener on unmount
-    return () => unsubscribe();
-  }, []); // Empty array ensures this runs only once
-
   return (
     <AuthProvider>
       <HashRouter>
         <Routes>
-          {/* Public Kiosk Route */}
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/kiosk" element={<KioskIntakePage />} />
+          <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
           {/* Authenticated Routes */}
-          <Route path="/" element={<Layout><HomePage /></Layout>} />
-          <Route path="/clients/:clientId" element={<Layout><ClientDashboardPage /></Layout>} />
-          <Route path="/reports" element={<Layout><ReportsPage /></Layout>} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout><HomePage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/clients/:clientId" element={
+            <ProtectedRoute>
+              <Layout><ClientDashboardPage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <Layout><ReportsPage /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Admin Routes */}
+          <Route
+            path="/users"
+            element={
+              <AdminRoute>
+                <Layout><UsersPage /></Layout>
+              </AdminRoute>
+            }
+          />
           <Route
             path="/export"
             element={

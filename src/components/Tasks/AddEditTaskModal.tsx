@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Task } from '../../types';
 import { X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/mockApi';
+import api from '../../lib/firebase';
 
 interface AddEditTaskModalProps {
   isOpen: boolean;
@@ -48,23 +48,23 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !dueDate) return;
-    
+
     setIsSaving(true);
     const selectedAdmin = admins.find(a => a.id === assignedToId);
-    
+
     const taskData = {
       id: taskToEdit?.id,
-      clientId,
-      clientName,
-      title,
+      clientId: clientId,
+      clientName: clientName,
+      title: title,
       dueDate: new Date(dueDate).getTime(),
-      urgency,
-      assignedToId,
+      urgency: urgency,
+      assignedToId: assignedToId,
       assignedToName: selectedAdmin?.name || 'Unknown',
       createdBy: user.name,
       status: status,
-      details: taskToEdit?.details || '', // This field isn't currently editable in the form
-      linkTo: linkTo || null, // Save the link
+      details: taskToEdit?.details || '',
+      linkTo: linkTo || null,
     };
 
     try {
@@ -97,7 +97,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
               <label htmlFor="title" className="block text-sm font-medium text-gray-700">Description</label>
               <textarea id="title" value={title} onChange={(e) => setTitle(e.target.value)} rows={3} className="form-input mt-1" required />
             </div>
-            
+
             {/* --- Added Link Input --- */}
             <div>
               <label htmlFor="linkTo" className="block text-sm font-medium text-gray-700">Link URL (Optional)</label>

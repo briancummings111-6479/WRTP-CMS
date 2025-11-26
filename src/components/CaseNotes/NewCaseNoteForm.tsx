@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { CaseNote } from '../../types';
-import api from '../../services/mockApi';
+import api from '../../lib/firebase';
 import { Bold, Italic, List } from 'lucide-react';
 import Card from '../Card';
 
@@ -71,7 +71,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     if (user?.role !== 'admin') {
         return null; // Don't render form for non-admins
     }
-    
+
     const handleFormat = (command: string) => {
         editorRef.current?.focus();
         document.execCommand(command, false);
@@ -94,11 +94,11 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         if (!noteBody.trim() || !user) return;
 
         setSubmitting(true);
-        
+
         try {
             const timestamp = new Date(noteDate + 'T00:00:00').getTime();
             if (isEditing && noteToEdit) {
-                 const updatedNote: CaseNote = {
+                const updatedNote: CaseNote = {
                     ...noteToEdit,
                     noteType,
                     urgency,
@@ -110,7 +110,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     staffId: user.uid,
                     staffName: user.name,
                     noteDate: timestamp,
-                 };
+                };
                 await api.updateCaseNote(updatedNote);
             } else {
                 const newNoteData = {
@@ -156,7 +156,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                         </select>
                     </div>
                     {/* Urgency */}
-                     <div>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700">Urgency</label>
                         <select value={urgency} onChange={e => setUrgency(e.target.value as CaseNote['urgency'])} className="form-input">
                             <option value="Green">Green (Normal)</option>
@@ -196,9 +196,9 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     <label className="block text-sm font-medium text-gray-700">Note Body</label>
                     <div className="mt-1 border border-gray-300 rounded-md">
                         <div className="flex items-center p-2 border-b bg-gray-50 space-x-2 rounded-t-md">
-                            <button type="button" onClick={() => handleFormat('bold')} className="p-1.5 rounded hover:bg-gray-200"><Bold className="w-4 h-4"/></button>
-                            <button type="button" onClick={() => handleFormat('italic')} className="p-1.5 rounded hover:bg-gray-200"><Italic className="w-4 h-4"/></button>
-                            <button type="button" onClick={() => handleFormat('insertUnorderedList')} className="p-1.5 rounded hover:bg-gray-200"><List className="w-4 h-4"/></button>
+                            <button type="button" onClick={() => handleFormat('bold')} className="p-1.5 rounded hover:bg-gray-200"><Bold className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => handleFormat('italic')} className="p-1.5 rounded hover:bg-gray-200"><Italic className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => handleFormat('insertUnorderedList')} className="p-1.5 rounded hover:bg-gray-200"><List className="w-4 h-4" /></button>
                         </div>
                         <div
                             ref={editorRef}
@@ -210,12 +210,12 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                 </div>
 
                 {/* Duration and Attachments */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Duration (Minutes)</label>
                         <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(parseInt(e.target.value, 10))} className="form-input" min="0" />
                     </div>
-                     <div>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700">Attachments</label>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="form-input text-sm p-1.5" />
                     </div>
@@ -229,7 +229,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                         </ul>
                     </div>
                 )}
-                
+
 
                 <div className="flex justify-end space-x-2">
                     {isEditing && onCancel && (
@@ -242,7 +242,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </button>
                 </div>
             </form>
-             <style>{`
+            <style>{`
                 .form-input {
                     display: block;
                     width: 100%;

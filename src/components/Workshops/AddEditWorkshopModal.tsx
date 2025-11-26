@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Workshop } from '../../types';
 import { X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/mockApi';
+import api from '../../lib/firebase';
 
 interface AddEditWorkshopModalProps {
   isOpen: boolean;
@@ -26,17 +26,23 @@ const AddEditWorkshopModal: React.FC<AddEditWorkshopModalProps> = ({ isOpen, onC
     if (isOpen) {
       if (workshopToEdit) {
         setFormData({
-            ...workshopToEdit,
-            // FIX: Error on line 29. Convert timestamp to a 'YYYY-MM-DD' string for the date input.
-            workshopDate: new Date(workshopToEdit.workshopDate).toISOString().split('T')[0]
+          ...workshopToEdit,
+          // FIX: Convert timestamp to 'YYYY-MM-DD' string using local time to avoid timezone shifts
+          workshopDate: (() => {
+            const date = new Date(workshopToEdit.workshopDate);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          })()
         });
       } else {
         // Reset form for new workshop
         setFormData({
-            workshopName: 'Career Explorations',
-            status: 'Scheduled',
-            assignedToId: user?.uid || (admins.length > 0 ? admins[0].id : ''),
-            workshopDate: '', // Initialize as empty string for controlled input
+          workshopName: 'Career Explorations',
+          status: 'Scheduled',
+          assignedToId: user?.uid || (admins.length > 0 ? admins[0].id : ''),
+          workshopDate: '', // Initialize as empty string for controlled input
         });
       }
     }
@@ -50,26 +56,28 @@ const AddEditWorkshopModal: React.FC<AddEditWorkshopModalProps> = ({ isOpen, onC
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !formData.workshopDate) return;
-    
+
     setIsSaving(true);
     const selectedAdmin = admins.find(a => a.id === formData.assignedToId);
-    
+
     const workshopData = {
       ...workshopToEdit,
       ...formData,
       clientId,
-      // Convert string date back to timestamp for saving.
-      workshopDate: new Date(formData.workshopDate).getTime(),
+      // Convert string date to timestamp for saving, treating it as local time
+      // Appending 'T00:00:00' ensures it's parsed as local midnight instead of UTC midnight
+      workshopDate: new Date(formData.workshopDate + 'T00:00:00').getTime(),
       assignedToName: selectedAdmin?.name || 'Unknown',
     };
 
     try {
-      const savedWorkshop = await api.upsertWorkshop(workshopData as Omit<Workshop, 'id'> & { id?: string });
+      // The API function `upsertWorkshop` handles both create and update
+      const savedWorkshop = await api.upsertWorkshop(workshopData as any);
       onSave(savedWorkshop);
       onClose();
     } catch (error) {
       console.error("Failed to save workshop", error);
-      alert("Failed to save workshop. Please try again.");
+      // alert("Failed to save workshop. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -89,42 +97,42 @@ const AddEditWorkshopModal: React.FC<AddEditWorkshopModalProps> = ({ isOpen, onC
         <form onSubmit={handleSubmit}>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="workshopName" className="block text-sm font-medium text-gray-700">Workshop Name</label>
-                    <select id="workshopName" name="workshopName" value={formData.workshopName} onChange={handleInputChange} className="form-input mt-1">
-                        {workshopNames.map(name => <option key={name} value={name}>{name}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label htmlFor="workshopDate" className="block text-sm font-medium text-gray-700">Workshop Date</label>
-                    {/* FIX: Error on line 96. The value is now correctly a string. Removed incorrect type cast. */}
-                    <input type="date" id="workshopDate" name="workshopDate" value={formData.workshopDate || ''} onChange={handleInputChange} className="form-input mt-1" required />
-                </div>
+              <div>
+                <label htmlFor="workshopName" className="block text-sm font-medium text-gray-700">Workshop Name</label>
+                <select id="workshopName" name="workshopName" value={formData.workshopName} onChange={handleInputChange} className="form-input mt-1">
+                  {workshopNames.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="workshopDate" className="block text-sm font-medium text-gray-700">Workshop Date</label>
+                <input type="date" id="workshopDate" name="workshopDate" value={formData.workshopDate || ''} onChange={handleInputChange} className="form-input mt-1" required />
+              </div>
             </div>
             {formData.workshopName === 'Other' && (
-                <div>
-                    <label htmlFor="workshopNameOther" className="block text-sm font-medium text-gray-700">Custom Workshop Name</label>
-                    <input type="text" id="workshopNameOther" name="workshopNameOther" value={formData.workshopNameOther} onChange={handleInputChange} className="form-input mt-1" required />
-                </div>
+              <div>
+                <label htmlFor="workshopNameOther" className="block text-sm font-medium text-gray-700">Custom Workshop Name</label>
+                <input type="text" id="workshopNameOther" name="workshopNameOther" value={formData.workshopNameOther} onChange={handleInputChange} className="form-input mt-1" required />
+              </div>
             )}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="status" name="status" value={formData.status} onChange={handleInputChange} className="form-input mt-1">
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Declined">Declined</option>
-                        <option value="No Show">No Show</option>
-                    </select>
-                </div>
-                 <div>
-                    <label htmlFor="assignedToId" className="block text-sm font-medium text-gray-700">Assigned Staff</label>
-                    <select id="assignedToId" name="assignedToId" value={formData.assignedToId} onChange={handleInputChange} className="form-input mt-1" required>
-                        {admins.map(admin => (
-                        <option key={admin.id} value={admin.id}>{admin.name}</option>
-                        ))}
-                    </select>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                <select id="status" name="status" value={formData.status} onChange={handleInputChange} className="form-input mt-1">
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Declined">Declined</option>
+                  <option value="No Show">No Show</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="assignedToId" className="block text-sm font-medium text-gray-700">Assigned Staff</label>
+                <select id="assignedToId" name="assignedToId" value={formData.assignedToId} onChange={handleInputChange} className="form-input mt-1" required>
+                  {admins.map(admin => (
+                    <option key={admin.id} value={admin.id}>{admin.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <div className="flex justify-end items-center p-4 border-t bg-gray-50">

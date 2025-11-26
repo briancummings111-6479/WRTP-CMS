@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../services/mockApi';
+import api from '../../lib/firebase';
 import { CaseNote } from '../../types';
 import CaseNoteItem from './CaseNoteItem';
 import NewCaseNoteForm from './NewCaseNoteForm';
@@ -117,7 +117,7 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
             ) : (
                 <>
                     <NewCaseNoteForm clientId={clientId} onSave={handleSaveNote} />
-                    
+
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-medium text-gray-900">Note History</h3>
@@ -134,8 +134,8 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
                         {notes.length > 0 ? (
                             <div className="space-y-4">
                                 {notes.map(note => (
-                                    <CaseNoteItem 
-                                        key={note.id} 
+                                    <CaseNoteItem
+                                        key={note.id}
                                         note={note}
                                         onEdit={handleStartEditing}
                                         clientName={clientName}

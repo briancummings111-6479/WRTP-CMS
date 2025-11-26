@@ -1,11 +1,12 @@
 import React from 'react';
 import { CaseNote } from '../../types';
-import { Clock, Calendar, User, Tag, Phone, Printer, Flame, AlertTriangle, Circle, Edit } from 'lucide-react';
+import { Clock, Calendar, User, Tag, Phone, Printer, Flame, AlertTriangle, Circle, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface CaseNoteItemProps {
     note: CaseNote;
     onEdit: (note: CaseNote) => void;
+    onDelete: (noteId: string) => void;
     clientName: string;
 }
 
@@ -37,9 +38,15 @@ const UrgencyBadge: React.FC<{ urgency: CaseNote['urgency'] }> = ({ urgency }) =
 };
 
 
-const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, clientName }) => {
+const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, onDelete, clientName }) => {
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
+
+    const handleDelete = () => {
+        if (window.confirm("Are you sure you want to delete this case note?")) {
+            onDelete(note.id);
+        }
+    };
 
     const generatePrintHTML = (noteToPrint: CaseNote): string => {
         const renderNoteHTML = (note: CaseNote) => `
@@ -86,7 +93,7 @@ const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, clientName })
             </html>
         `;
     };
-    
+
     const handlePrint = () => {
         const printContent = generatePrintHTML(note);
         const printWindow = window.open('', '_blank');
@@ -99,7 +106,7 @@ const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, clientName })
             }, 500); // Allow time for styles to load
         }
     };
-    
+
     // Function to auto-link URLs in text
     const linkify = (text: string) => {
         const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
@@ -112,25 +119,30 @@ const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, clientName })
                 <div>
                     <h4 className="font-bold text-gray-800">{note.noteType}</h4>
                     <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-                        <span className="flex items-center"><Calendar className="w-3 h-3 mr-1"/>{new Date(note.noteDate).toLocaleString()}</span>
-                        <span className="flex items-center"><User className="w-3 h-3 mr-1"/>{note.staffName}</span>
+                        <span className="flex items-center"><Calendar className="w-3 h-3 mr-1" />{new Date(note.noteDate).toLocaleString()}</span>
+                        <span className="flex items-center"><User className="w-3 h-3 mr-1" />{note.staffName}</span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
                     <UrgencyBadge urgency={note.urgency} />
                     {isAdmin && (
-                        <button onClick={() => onEdit(note)} className="text-gray-400 hover:text-[#404E3B] no-print" aria-label="Edit note">
-                            <Edit className="w-5 h-5" />
-                        </button>
+                        <>
+                            <button onClick={() => onEdit(note)} className="text-gray-400 hover:text-[#404E3B] no-print" aria-label="Edit note">
+                                <Edit className="w-5 h-5" />
+                            </button>
+                            <button onClick={handleDelete} className="text-gray-400 hover:text-red-600 no-print" aria-label="Delete note">
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        </>
                     )}
                     <button onClick={handlePrint} className="text-gray-400 hover:text-[#404E3B] no-print" aria-label="Print note">
                         <Printer className="w-5 h-5" />
                     </button>
                 </div>
             </div>
-            <hr className="my-3"/>
+            <hr className="my-3" />
             <div className="prose prose-sm max-w-none text-gray-700 break-all" dangerouslySetInnerHTML={{ __html: linkify(note.noteBody) }} />
-            
+
             {note.attachments.length > 0 && (
                 <div className="mt-3">
                     <h5 className="text-sm font-semibold text-gray-600">Attachments:</h5>
@@ -145,9 +157,9 @@ const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, clientName })
             )}
 
             <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                <span className="flex items-center"><Tag className="w-3 h-3 mr-1.5"/>Service: {note.serviceType}</span>
-                <span className="flex items-center"><Phone className="w-3 h-3 mr-1.5"/>{note.contactMethod}</span>
-                <span className="flex items-center"><Clock className="w-3 h-3 mr-1.5"/>{note.durationMinutes} mins</span>
+                <span className="flex items-center"><Tag className="w-3 h-3 mr-1.5" />Service: {note.serviceType}</span>
+                <span className="flex items-center"><Phone className="w-3 h-3 mr-1.5" />{note.contactMethod}</span>
+                <span className="flex items-center"><Clock className="w-3 h-3 mr-1.5" />{note.durationMinutes} mins</span>
             </div>
         </div>
     );

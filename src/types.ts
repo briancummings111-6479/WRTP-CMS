@@ -1,11 +1,12 @@
 // User and Auth
-export type UserRole = 'admin' | 'viewer';
+export type UserRole = 'admin' | 'viewer' | 'pending';
 
 export interface User {
   uid: string;
   name: string;
   email: string;
   role: UserRole;
+  title?: string;
 }
 
 // --- NEW Audit Checklist Types ---
@@ -27,15 +28,117 @@ export interface AuditChecklist {
 }
 // ---------------------------------
 
+// Demographics Interface
+export interface Demographics {
+  // Section 2
+  residentOfShastaCounty: boolean;
+  currentlyEmployed: boolean;
+  publicAssistance: {
+    housing: boolean;
+    calFresh: boolean;
+    calWorksSSI: boolean;
+    unemployment: boolean;
+    childcare: boolean;
+    tribalFunding: boolean;
+    other: string;
+  };
+  barriersToEmployment: {
+    transportation: boolean;
+    socialSecurityCard: boolean;
+    criminalRecord: boolean;
+    housingInstability: boolean;
+    disability: boolean;
+    mentalHealthChallenges: boolean;
+    substanceUseRecovery: boolean;
+    stateIdDriversLicense: boolean;
+    other: string;
+  };
+  // Section 3
+  educationLevel: 'No High School Diploma' | 'GED' | 'High School Diploma' | 'Some College' | 'Associate Degree' | 'Bachelor\'s Degree' | 'Other';
+  educationOther?: string;
+  currentlyEnrolled: boolean;
+  hasResume: boolean;
+  jobInterests: string;
+  interestedInTraining: boolean;
+  // Section 4
+  supportServices: {
+    resumeInterviewHelp: boolean;
+    transportation: boolean;
+    childcare: boolean;
+    mentalHealthCounseling: boolean;
+    legalServices: boolean;
+    other: string;
+  };
+  // Household Composition
+  householdComposition: {
+    liveAlone: boolean;
+    members: Array<{
+      name: string;
+      dob: string;
+      enrolledInSchool: boolean;
+    }>;
+    expectChange: boolean;
+    changeExplanation?: string;
+  };
+  // Conflict of Interest
+  conflictOfInterest: {
+    hasConflict: boolean;
+    relationship?: string;
+  };
+  // Self-Certification of Annual Income
+  incomeCertification: {
+    applicantName: string;
+    householdSize: number;
+    femaleHeadOfHousehold: boolean;
+    seniorHeadOfHousehold: boolean;
+    singleParentFamily: boolean;
+    disabledFamilyMember: boolean;
+    elderlyCount: number;
+    studentCount: number;
+    under18Count: number;
+    gender: 'Male' | 'Female' | 'Non-Binary' | 'Choose not to disclose';
+    race: {
+      white: boolean;
+      nativeHawaiianPI: boolean;
+      asian: boolean;
+      americanIndianAlaskanNative: boolean;
+      twoOrMoreRaces: boolean;
+      preferNotToAnswer: boolean;
+      blackAfricanAmerican: boolean;
+    };
+    hispanicLatino: 'Yes' | 'No' | 'Prefer Not To Answer';
+    annualIncome: number;
+  };
+  // Disaster Recovery Benefits
+  disasterRecovery: {
+    receivedAssistance: boolean;
+    assistanceDetails?: string;
+    participatedSimilar: boolean;
+    similarDetails?: string;
+  };
+  // New Demographics Fields
+  femaleTrainee?: boolean;
+  fosterYouth?: boolean;
+  agingOutFosterCare?: boolean;
+  homeless?: boolean;
+  limitedSpeakingEnglish?: boolean;
+  veteran?: boolean;
+  releasedCorrectionalFacility?: boolean;
+  selfCertificationAnnualIncome?: number;
+}
+
 // Main Client Data Model
 export interface Client {
   id: string;
+  participantId?: string;
   googleDriveLink?: string;
   profile: {
     firstName: string;
     lastName: string;
+    middleInitial?: string; // Added
     dob?: string; // YYYY-MM-DD
     age: number;
+    gender?: string; // Added
   };
   contactInfo: {
     phone: string;
@@ -49,38 +152,41 @@ export interface Client {
   };
   referralSource: string;
 
-  // --- REPLACED caseManagement with auditChecklist ---
   auditChecklist: AuditChecklist;
-  // --------------------------------------------------
 
   training: {
-      cpr: boolean;
-      firstAid: boolean;
-      foodHandlersCard: boolean;
-      osha10: boolean; // Added
-      nccer: boolean; // Added
-      otherCertificates?: string;
-      constructionCTE: boolean;
-      cosmetologyCTE: boolean;
-      culinaryCTE: boolean;
-      fireCTE: boolean;
-      medicalCTE: boolean;
-      earlyChildhoodEducationCTE: boolean; // Added
-      entrepreneurshipCTE: boolean; // Added
-      otherCteProgram?: string;
+    cpr: boolean;
+    firstAid: boolean;
+    foodHandlersCard: boolean;
+    osha10: boolean; // Added
+    nccer: boolean; // Added
+    otherCertificates?: string;
+    constructionCTE: boolean;
+    cosmetologyCTE: boolean;
+    culinaryCTE: boolean;
+    fireCTE: boolean;
+    medicalCTE: boolean;
+    earlyChildhoodEducationCTE: boolean; // Added
+    entrepreneurshipCTE: boolean; // Added
+    otherCteProgram?: string;
   };
+
+  demographics?: Demographics;
 
   metadata: {
+    dateCreated: number; // Timestamp
     createdBy: string; // UID
+    lastModified: number; // Timestamp
     lastModifiedBy: string; // UID
-    clientType: 'General Population' | 'CHYBA';
     status: 'Prospect' | 'Active' | 'Inactive';
-    initialAppointmentDate: number; // Timestamp
-    assignedAdminId: string; // UID
-    assignedAdminName: string;
+    clientType: 'General Population' | 'CHYBA';
+    assignedAdminId?: string; // UID
+    assignedAdminName?: string;
+    lastCaseNoteDate?: number; // Timestamp
+    dateApplication?: number; // Timestamp - Added
+    dateWithdrew?: number; // Timestamp - Added
   };
 }
-
 
 // Task Data Model
 export interface Task {
@@ -177,17 +283,18 @@ export interface ClientAttachment {
   storageUrl: string;
   uploadedBy: string; // staffName
   uploadDate: number; // timestamp
+  category?: string;
 }
 
 // Workshop Model
 export interface Workshop {
-  id:string;
+  id: string;
   clientId: string;
   workshopDate: number; // Timestamp
   // --- FIX: Added 'Resume Building' to the type ---
   workshopName: 'Career Explorations' | 'Job Preparedness' | 'Interview Success' | 'Financial Literacy' | 'Entrepreneurship' | 'Resume Building' | 'Other';
   workshopNameOther?: string;
-  status: 'Scheduled' | 'Declined' | 'Completed' | 'No Show';
+  status: 'Scheduled' | 'In Progress' | 'Declined' | 'Completed' | 'No Show';
   assignedToId: string; // UID of staff
   assignedToName: string;
   associatedTaskId?: string; // ID of the task created for this workshop

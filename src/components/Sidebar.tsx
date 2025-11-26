@@ -9,6 +9,7 @@ const commonNavItems: { to: string; text: string; icon: React.ElementType }[] = 
 ];
 
 const adminNavItems: { to: string; text: string; icon: React.ElementType }[] = [
+  { to: '/users', text: 'Users', icon: Users },
   { to: '/export', text: 'Data Export', icon: Download },
   { to: '/import', text: 'Data Import', icon: Upload },
 ];
@@ -18,10 +19,9 @@ const NavItem: React.FC<{ to: string, text: string, icon: React.ElementType }> =
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
-        isActive
-          ? 'bg-[#829b96] text-white'
-          : 'text-slate-300 hover:bg-[#829b96] hover:text-white'
+      `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${isActive
+        ? 'bg-[#829b96] text-white'
+        : 'text-slate-300 hover:bg-[#829b96] hover:text-white'
       }`
     }
   >
@@ -31,15 +31,11 @@ const NavItem: React.FC<{ to: string, text: string, icon: React.ElementType }> =
 );
 
 const Sidebar = () => {
-    const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="w-64 bg-[#6C8480] border-r border-[#5a6e69] flex flex-col no-print">
-      <div className="flex items-center justify-center h-16 border-b border-[#5a6e69]">
-        <ClipboardList className="h-8 w-8 text-[#E6E6E6]" />
-        <span className="ml-2 text-lg font-bold text-white">WRTP</span>
-      </div>
       <nav className="flex-1 px-4 py-4 space-y-2">
         {commonNavItems.map(({ to, text, icon }) => <NavItem key={to} to={to} text={text} icon={icon} />)}
         {isAdmin && adminNavItems.map(({ to, text, icon }) => <NavItem key={to} to={to} text={text} icon={icon} />)}

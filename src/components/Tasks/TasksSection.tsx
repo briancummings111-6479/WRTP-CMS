@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../../services/mockApi';
-import { Task } from '../../types';
+import api from '../../lib/firebase';
+import { Task, User as AppUser } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../Card';
 import TaskItem from './TaskItem';
@@ -23,12 +23,12 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
   const fetchTasksAndAdmins = useCallback(async () => {
     setLoading(true);
     try {
-      const [tasksData, adminsData] = await Promise.all([
+      const [tasksData, staffData] = await Promise.all([
         api.getTasksByClientId(clientId),
-        api.getAdmins()
+        api.getStaffUsers()
       ]);
-      setTasks(tasksData.filter(t => t.status !== 'Completed').sort((a,b) => a.dueDate - b.dueDate));
-      setAdmins(adminsData);
+      setTasks(tasksData.filter(t => t.status !== 'Completed').sort((a, b) => a.dueDate - b.dueDate));
+      setAdmins(staffData.map((s: AppUser) => ({ id: s.uid, name: s.name })));
     } catch (error) {
       console.error("Failed to fetch tasks or admins:", error);
     } finally {
@@ -53,14 +53,14 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
   const handleSaveTask = (savedTask: Task) => {
     // Optimistically update UI
     setTasks(prevTasks => {
-        const existingIndex = prevTasks.findIndex(t => t.id === savedTask.id);
-        if (existingIndex > -1) {
-            const newTasks = [...prevTasks];
-            newTasks[existingIndex] = savedTask;
-            return newTasks;
-        } else {
-            return [...prevTasks, savedTask];
-        }
+      const existingIndex = prevTasks.findIndex(t => t.id === savedTask.id);
+      if (existingIndex > -1) {
+        const newTasks = [...prevTasks];
+        newTasks[existingIndex] = savedTask;
+        return newTasks;
+      } else {
+        return [...prevTasks, savedTask];
+      }
     });
     // For a real app, you might re-fetch here instead:
     // fetchTasksAndAdmins();
@@ -68,11 +68,11 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-        await api.deleteTask(taskId);
-        setTasks(prev => prev.filter(t => t.id !== taskId));
+      await api.deleteTask(taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
     } catch (error) {
-        console.error("Failed to delete task", error);
-        // alert("Failed to delete task. Please try again."); // Removed alert
+      console.error("Failed to delete task", error);
+      // alert("Failed to delete task. Please try again."); // Removed alert
     }
   };
 

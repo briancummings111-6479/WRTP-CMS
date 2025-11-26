@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/mockApi';
+import api from '../lib/firebase';
 import { Client, Workshop } from '../types';
 import Card from '../components/Card';
 import { Printer } from 'lucide-react';
@@ -8,6 +8,7 @@ import { Printer } from 'lucide-react';
 const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
     const statusStyles: { [key in Workshop['status']]: string } = {
         Scheduled: 'bg-blue-100 text-blue-800',
+        'In Progress': 'bg-purple-100 text-purple-800',
         Completed: 'bg-green-100 text-green-800',
         Declined: 'bg-yellow-100 text-yellow-800',
         'No Show': 'bg-red-100 text-red-800',
@@ -22,19 +23,31 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
 const ReportsPage: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [workshops, setWorkshops] = useState<Workshop[]>([]);
+    const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [workshopFilter, setWorkshopFilter] = useState('All');
+    const [selectedCaseManager, setSelectedCaseManager] = useState('All');
+    const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [clientsData, workshopsData] = await Promise.all([
+                const [clientsData, workshopsData, usersData] = await Promise.all([
                     api.getClients(),
-                    api.getAllWorkshops()
+                    api.getAllWorkshops(),
+                    api.getStaffUsers()
                 ]);
                 setClients(clientsData);
                 setWorkshops(workshopsData);
+
+                // Filter users to only those who are likely case managers (admin or viewer, or just all staff)
+                const staffUsers = usersData
+                    .filter(u => u.role === 'admin' || u.role === 'viewer')
+                    .map(u => ({ id: u.uid, name: u.name }));
+
+                setAdmins(staffUsers);
+
             } catch (error) {
                 console.error("Failed to fetch report data", error);
             } finally {
@@ -44,8 +57,13 @@ const ReportsPage: React.FC = () => {
         fetchData();
     }, []);
 
+    const filteredClients = useMemo(() => {
+        if (selectedCaseManager === 'All') return clients;
+        return clients.filter(c => c.metadata.assignedAdminId === selectedCaseManager);
+    }, [clients, selectedCaseManager]);
+
     const reportData = useMemo(() => {
-        const totalIndividuals = clients.length;
+        const totalIndividuals = filteredClients.length;
         if (totalIndividuals === 0) {
             return {
                 totalIndividuals: 0,
@@ -64,15 +82,15 @@ const ReportsPage: React.FC = () => {
             };
         }
 
-        const prospects = clients.filter(c => c.metadata.status === 'Prospect');
-        const enrolledClients = clients.filter(c => c.metadata.status !== 'Prospect');
-        
+        const prospects = filteredClients.filter(c => c.metadata.status === 'Prospect');
+        const enrolledClients = filteredClients.filter(c => c.metadata.status !== 'Prospect');
+
         const prospectsCount = prospects.length;
         const enrolledClientsCount = enrolledClients.length;
 
         const generalPopulationCount = enrolledClients.filter(c => c.metadata.clientType === 'General Population').length;
         const chybaCount = enrolledClients.filter(c => c.metadata.clientType === 'CHYBA').length;
-        
+
         const activeCount = enrolledClients.filter(c => c.metadata.status === 'Active').length;
         const inactiveCount = enrolledClients.filter(c => c.metadata.status === 'Inactive').length;
 
@@ -92,18 +110,95 @@ const ReportsPage: React.FC = () => {
             inactivePercentage: enrolledClientsCount > 0 ? (inactiveCount / enrolledClientsCount) * 100 : 0,
         };
 
-    }, [clients]);
+    }, [filteredClients]);
+
+    const workshopMatrixData = useMemo(() => {
+        const allWorkshopNames = Array.from(new Set(workshops.map(w =>
+            w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName
+        ))).sort((a, b) => {
+            const predefinedOrder = [
+                'Career Explorations',
+                'Job Preparedness',
+                'Interview Success',
+                'Financial Literacy',
+                'Entrepreneurship'
+            ];
+
+            const indexA = predefinedOrder.indexOf(a);
+            const indexB = predefinedOrder.indexOf(b);
+
+            // Both are predefined -> sort by order
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+
+            // Only A is predefined -> A comes first
+            if (indexA !== -1) return -1;
+            // Only B is predefined -> B comes first
+            if (indexB !== -1) return 1;
+
+            // Special case: 'Other' always comes last
+            if (a === 'Other') return 1;
+            if (b === 'Other') return -1;
+
+            // Both are non-predefined (custom) -> sort alphabetical
+            return a.localeCompare(b);
+        });
+
+        const matrix = filteredClients
+            .map(client => {
+                const clientWorkshops = workshops.filter(w => w.clientId === client.id);
+                const workshopStatusMap: { [key: string]: Workshop['status'] } = {};
+
+                clientWorkshops.forEach(w => {
+                    const name = w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName;
+                    if (!workshopStatusMap[name] || w.status === 'Completed') {
+                        workshopStatusMap[name] = w.status;
+                    }
+                });
+
+                return {
+                    client,
+                    workshopStatusMap
+                };
+            })
+            // Sort by Client Name Alphabetically
+            .sort((a, b) => {
+                const nameA = `${a.client.profile.firstName} ${a.client.profile.lastName}`.toLowerCase();
+                const nameB = `${b.client.profile.firstName} ${b.client.profile.lastName}`.toLowerCase();
+                return nameA.localeCompare(nameB);
+            })
+            // Filter based on matrixStatusFilter
+            .filter(row => {
+                if (matrixStatusFilter === 'All') return true;
+
+                const statuses = Object.values(row.workshopStatusMap);
+
+                if (matrixStatusFilter === 'Blank') {
+                    // Show if ANY workshop is missing (blank)
+                    // A client has a "blank" for a workshop if that workshop name is NOT in their status map
+                    return Object.keys(row.workshopStatusMap).length < allWorkshopNames.length;
+                }
+
+                // Otherwise check if ANY of their workshops match the selected status
+                return statuses.includes(matrixStatusFilter as Workshop['status']);
+            });
+
+        return { allWorkshopNames, matrix };
+    }, [filteredClients, workshops, matrixStatusFilter]);
+
 
     const workshopReportData = useMemo(() => {
-        if (clients.length === 0 || workshops.length === 0) return { groupedWorkshops: {}, workshopNames: [] };
+        const filteredClientIds = new Set(filteredClients.map(c => c.id));
+        const relevantWorkshops = workshops.filter(w => filteredClientIds.has(w.clientId));
 
-        const clientMap = new Map(clients.map(c => [c.id, `${c.profile.firstName} ${c.profile.lastName}`]));
+        if (filteredClients.length === 0 || relevantWorkshops.length === 0) return { groupedWorkshops: {}, workshopNames: [] };
 
-        const grouped = workshops.reduce((acc, workshop) => {
-            const workshopDisplayName = workshop.workshopName === 'Other' && workshop.workshopNameOther 
-                ? workshop.workshopNameOther 
+        const clientMap = new Map(filteredClients.map(c => [c.id, `${c.profile.firstName} ${c.profile.lastName}`]));
+
+        const grouped = relevantWorkshops.reduce((acc, workshop) => {
+            const workshopDisplayName = workshop.workshopName === 'Other' && workshop.workshopNameOther
+                ? workshop.workshopNameOther
                 : workshop.workshopName;
-            
+
             if (!acc[workshopDisplayName]) {
                 acc[workshopDisplayName] = [];
             }
@@ -122,12 +217,128 @@ const ReportsPage: React.FC = () => {
         const workshopNames = Object.keys(grouped).sort();
 
         return { groupedWorkshops: grouped, workshopNames };
-    }, [clients, workshops]);
+    }, [filteredClients, workshops]);
+
+    const generateClientReportHTML = () => {
+        const caseManagerName = selectedCaseManager === 'All'
+            ? 'All Case Managers'
+            : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
+
+        return `
+            <html>
+            <head>
+                <title>Client Population Report</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>
+                    body { font-family: sans-serif; }
+                    .break-inside-avoid { page-break-inside: avoid; }
+                </style>
+            </head>
+            <body class="p-8 bg-white">
+                <header class="mb-8 border-b pb-4">
+                    <h1 class="text-3xl font-bold text-gray-900">Client Population Report</h1>
+                    <div class="mt-2 flex justify-between text-gray-600">
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                        <p>Case Manager: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
+                    </div>
+                </header>
+                
+                <main class="space-y-8">
+                    <section class="break-inside-avoid">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Overall Breakdown</h2>
+                        <div class="grid grid-cols-3 gap-6">
+                            <div class="bg-gray-50 p-4 rounded-lg border">
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
+                                <p class="text-3xl font-bold text-gray-800">${reportData.prospectsCount} <span class="text-lg font-normal text-gray-600">(${reportData.prospectsPercentage.toFixed(1)}%)</span></p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border">
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
+                                <p class="text-3xl font-bold text-gray-800">${reportData.enrolledClientsCount} <span class="text-lg font-normal text-gray-600">(${reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg border">
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
+                                <p class="text-3xl font-bold text-gray-800">${reportData.totalIndividuals}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="break-inside-avoid">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Enrolled Client Details</h2>
+                        <div class="grid grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="font-semibold text-gray-800 mb-3 text-lg">By Type</h3>
+                                <table class="w-full text-sm text-left text-gray-500">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-2">Type</th>
+                                            <th scope="col" class="px-4 py-2 text-right">Count</th>
+                                            <th scope="col" class="px-4 py-2 text-right">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="bg-white border-b">
+                                            <td class="px-4 py-2 font-medium text-gray-900">General Population</td>
+                                            <td class="px-4 py-2 text-right">${reportData.generalPopulationCount}</td>
+                                            <td class="px-4 py-2 text-right">${reportData.generalPopulationPercentage.toFixed(1)}%</td>
+                                        </tr>
+                                        <tr class="bg-white border-b">
+                                            <td class="px-4 py-2 font-medium text-gray-900">CHYBA</td>
+                                            <td class="px-4 py-2 text-right">${reportData.chybaCount}</td>
+                                            <td class="px-4 py-2 text-right">${reportData.chybaPercentage.toFixed(1)}%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-800 mb-3 text-lg">By Status</h3>
+                                <table class="w-full text-sm text-left text-gray-500">
+                                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-2">Status</th>
+                                            <th scope="col" class="px-4 py-2 text-right">Count</th>
+                                            <th scope="col" class="px-4 py-2 text-right">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="bg-white border-b">
+                                            <td class="px-4 py-2 font-medium text-gray-900">Active</td>
+                                            <td class="px-4 py-2 text-right">${reportData.activeCount}</td>
+                                            <td class="px-4 py-2 text-right">${reportData.activePercentage.toFixed(1)}%</td>
+                                        </tr>
+                                        <tr class="bg-white border-b">
+                                            <td class="px-4 py-2 font-medium text-gray-900">Inactive</td>
+                                            <td class="px-4 py-2 text-right">${reportData.inactiveCount}</td>
+                                            <td class="px-4 py-2 text-right">${reportData.inactivePercentage.toFixed(1)}%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </body>
+            </html>
+        `;
+    };
+
+    const handlePrintClientReport = () => {
+        const printContent = generateClientReportHTML();
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+    };
 
     const generateWorkshopReportHTML = () => {
         const getStatusBadgeHTML = (status: Workshop['status']) => {
             const statusStyles: { [key in Workshop['status']]: string } = {
                 Scheduled: 'bg-blue-100 text-blue-800',
+                'In Progress': 'bg-purple-100 text-purple-800',
                 Completed: 'bg-green-100 text-green-800',
                 Declined: 'bg-yellow-100 text-yellow-800',
                 'No Show': 'bg-red-100 text-red-800',
@@ -135,7 +346,7 @@ const ReportsPage: React.FC = () => {
             const classes = `px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`;
             return `<span class="${classes}">${status}</span>`;
         };
-        
+
         const workshopsToPrint = workshopReportData.workshopNames
             .filter(name => workshopFilter === 'All' || name === workshopFilter)
             .map(workshopName => {
@@ -166,12 +377,16 @@ const ReportsPage: React.FC = () => {
                         </div>
                     </div>
                 `;
-            }).join('<div class="h-8"></div>'); // Add some space between tables
+            }).join('<div class="h-8"></div>');
 
-        const noDataMessage = workshopReportData.workshopNames.length === 0 
-            ? '<p class="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>' 
+        const noDataMessage = workshopReportData.workshopNames.length === 0
+            ? '<p class="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>'
             : '';
-            
+
+        const caseManagerName = selectedCaseManager === 'All'
+            ? 'All Case Managers'
+            : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
+
         return `
             <html>
             <head>
@@ -186,6 +401,7 @@ const ReportsPage: React.FC = () => {
                 <header class="mb-6">
                     <h1 class="text-2xl font-bold">Workshop Attendance Report</h1>
                     <p class="text-gray-600">Generated on: ${new Date().toLocaleDateString()}</p>
+                    <p class="text-gray-600">Case Manager: ${caseManagerName}</p>
                     ${workshopFilter !== 'All' ? `<p class="text-gray-600">Filter: ${workshopFilter}</p>` : ''}
                 </header>
                 <main class="space-y-8">
@@ -195,7 +411,7 @@ const ReportsPage: React.FC = () => {
             </html>
         `;
     };
-    
+
     const handlePrintWorkshopReport = () => {
         const printContent = generateWorkshopReportHTML();
         const printWindow = window.open('', '_blank');
@@ -222,8 +438,37 @@ const ReportsPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800 no-print">Reports</h1>
-            <Card title="Client Population Report" className="no-print">
+            <div className="flex justify-between items-center no-print">
+                <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
+                <div className="flex items-center space-x-2">
+                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">Case Manager:</label>
+                    <select
+                        id="caseManagerFilter"
+                        value={selectedCaseManager}
+                        onChange={(e) => setSelectedCaseManager(e.target.value)}
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
+                    >
+                        <option value="All">All Case Managers</option>
+                        {admins.map(admin => (
+                            <option key={admin.id} value={admin.id}>{admin.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <Card
+                title="Client Population Report"
+                className="no-print"
+                titleAction={
+                    <button
+                        onClick={handlePrintClientReport}
+                        className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Report
+                    </button>
+                }
+            >
                 {/* Section 1: Overall Breakdown */}
                 <div className="border-b border-gray-200 pb-4 mb-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-3">Overall Breakdown</h3>
@@ -271,17 +516,84 @@ const ReportsPage: React.FC = () => {
                 </div>
             </Card>
 
-            <Card 
-                title="Workshop Attendance Report"
+            <Card
+                title="Workshop Matrix Report"
+                titleAction={
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="matrixStatusFilter" className="text-sm font-medium text-gray-700">Filter Status:</label>
+                        <select
+                            id="matrixStatusFilter"
+                            value={matrixStatusFilter}
+                            onChange={(e) => setMatrixStatusFilter(e.target.value)}
+                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                        >
+                            <option value="All">All Statuses</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Declined">Declined</option>
+                            <option value="No Show">No Show</option>
+                            <option value="Blank">Not Enrolled (Blank)</option>
+                        </select>
+                    </div>
+                }
+            >
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                                    Client Name
+                                </th>
+                                {workshopMatrixData.allWorkshopNames.map(name => (
+                                    <th key={name} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                        {name}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {workshopMatrixData.matrix.map(({ client, workshopStatusMap }) => (
+                                <tr key={client.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 border-r">
+                                        <Link to={`/clients/${client.id}`} className="text-[#404E3B] hover:underline">
+                                            {client.profile.firstName} {client.profile.lastName}
+                                        </Link>
+                                    </td>
+                                    {workshopMatrixData.allWorkshopNames.map(name => (
+                                        <td key={name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {workshopStatusMap[name] ? (
+                                                <WorkshopStatusBadge status={workshopStatusMap[name]} />
+                                            ) : (
+                                                <span className="text-gray-300">-</span>
+                                            )}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                            {workshopMatrixData.matrix.length === 0 && (
+                                <tr>
+                                    <td colSpan={workshopMatrixData.allWorkshopNames.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
+                                        No clients found matching the criteria.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+
+            <Card
+                title="Workshop Attendance List"
                 className="printable-card"
                 titleAction={
                     <div className="relative z-10 flex items-center space-x-4 no-print">
                         <div>
                             <label htmlFor="workshopFilter" className="sr-only">Filter by workshop</label>
-                            <select 
-                                id="workshopFilter" 
-                                value={workshopFilter} 
-                                onChange={e => setWorkshopFilter(e.target.value)} 
+                            <select
+                                id="workshopFilter"
+                                value={workshopFilter}
+                                onChange={e => setWorkshopFilter(e.target.value)}
                                 className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
                             >
                                 <option value="All">All Workshops</option>
@@ -334,7 +646,7 @@ const ReportsPage: React.FC = () => {
                             </div>
                         </div>
                     ))}
-                        {workshopReportData.workshopNames.length === 0 && !loading && (
+                    {workshopReportData.workshopNames.length === 0 && !loading && (
                         <p className="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>
                     )}
                 </div>
