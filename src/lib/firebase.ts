@@ -47,10 +47,13 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  // --- Initialization ---
-  let app: FirebaseApp;
-  if(!getApps().length) {
-    app = initializeApp(firebaseConfig);
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// --- Initialization ---
+let app: FirebaseApp;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
 } else {
   app = getApp();
 }
@@ -237,7 +240,7 @@ const api = {
       q = query(collection(db, "tasks"), where("clientId", "==", clientId));
     }
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Task));
   },
 
   getTasksByUserId: async (userId: string): Promise<Task[]> => {

@@ -124,8 +124,8 @@ const ReportsPage: React.FC = () => {
                 'Entrepreneurship'
             ];
 
-            const indexA = predefinedOrder.indexOf(a);
-            const indexB = predefinedOrder.indexOf(b);
+            const indexA = predefinedOrder.indexOf(a as string);
+            const indexB = predefinedOrder.indexOf(b as string);
 
             // Both are predefined -> sort by order
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
@@ -140,7 +140,7 @@ const ReportsPage: React.FC = () => {
             if (b === 'Other') return -1;
 
             // Both are non-predefined (custom) -> sort alphabetical
-            return a.localeCompare(b);
+            return (a as string).localeCompare(b as string);
         });
 
         const matrix = filteredClients

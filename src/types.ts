@@ -185,6 +185,7 @@ export interface Client {
     lastCaseNoteDate?: number; // Timestamp
     dateApplication?: number; // Timestamp - Added
     dateWithdrew?: number; // Timestamp - Added
+    initialAppointmentDate?: number; // Timestamp - Added
   };
 }
 
@@ -219,7 +220,6 @@ export interface CaseNote {
   noteBody: string; // HTML
   attachments: { fileName: string; storageUrl: string }[];
 }
-
 
 // Assessment Model
 export interface WRTPAssessment {
