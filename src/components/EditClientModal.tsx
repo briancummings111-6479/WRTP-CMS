@@ -150,7 +150,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
                     className="form-input"
                   >
                     <option value="">Unassigned</option>
-                    {staff.map(s => (
+                    {staff.filter(s => s.title?.toLowerCase().includes('case manager')).map(s => (
                       <option key={s.uid} value={s.uid}>
                         {s.name} {s.title ? `(${s.title})` : ''}
                       </option>

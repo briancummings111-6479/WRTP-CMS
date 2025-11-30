@@ -193,7 +193,7 @@ const HomePage: React.FC = () => {
                     className="block w-full sm:w-1/3 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
                   >
                     <option value="All Case Managers">All Case Managers</option>
-                    {staff.map(s => (
+                    {staff.filter(s => s.title?.toLowerCase().includes('case manager')).map(s => (
                       <option key={s.uid} value={s.uid}>{s.name}</option>
                     ))}
                   </select>

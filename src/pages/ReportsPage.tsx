@@ -41,9 +41,9 @@ const ReportsPage: React.FC = () => {
                 setClients(clientsData);
                 setWorkshops(workshopsData);
 
-                // Filter users to only those who are likely case managers (admin or viewer, or just all staff)
+                // Filter users to only those with "Case Manager" in their title
                 const staffUsers = usersData
-                    .filter(u => u.role === 'admin' || u.role === 'viewer')
+                    .filter(u => u.title?.toLowerCase().includes('case manager'))
                     .map(u => ({ id: u.uid, name: u.name }));
 
                 setAdmins(staffUsers);

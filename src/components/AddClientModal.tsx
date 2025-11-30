@@ -229,7 +229,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                     <label className="label">Assigned Case Manager</label>
                                     <select name="assignedAdminId" value={formData.metadata.assignedAdminId} onChange={handleMetadataChange} className="form-input">
                                         <option value="">Unassigned</option>
-                                        {staff.map(s => (
+                                        {staff.filter(s => s.title?.toLowerCase().includes('case manager')).map(s => (
                                             <option key={s.uid} value={s.uid}>
                                                 {s.name} {s.title ? `(${s.title})` : ''}
                                             </option>
