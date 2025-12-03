@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -20,7 +21,7 @@ const Header = () => {
     <header className="flex justify-between items-center p-4 bg-[#6C8480] border-b border-[#5a6e69] no-print">
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
-          <img src="/src/assets/logo.png" alt="CHYBA Logo" className="h-12 w-auto" />
+          <img src={logo} alt="CHYBA Logo" className="h-12 w-auto" />
           <span className="text-xl font-bold text-white tracking-wider">CHYBA-WRTP</span>
         </div>
         <div className="h-8 w-px bg-[#829b96] mx-4 hidden md:block"></div>
