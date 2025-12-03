@@ -96,6 +96,9 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                 </div>
             )}
 
+            {/* Attachments Section */}
+            <AttachmentsSection clientId={client.id} category="Enrollment" />
+
             {/* Section 1: Contact Information (Read-Only) */}
             <section className="space-y-4">
                 <h3 className="text-xl font-semibold text-gray-700 border-b pb-2">Section 1: Contact Information</h3>
@@ -421,7 +424,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                 </div>
             </section>
 
-            <AttachmentsSection clientId={client.id} category="Enrollment" />
+
         </div>
     );
 };
