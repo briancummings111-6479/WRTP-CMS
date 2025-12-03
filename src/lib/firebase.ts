@@ -392,45 +392,48 @@ const api = {
 
   // In a real app with Firebase Admin SDK, we would create the auth user here.
   // Client-side, we can only create a Firestore document to "whitelist" them.
-  // When they sign in, AuthContext matches the email.
   inviteUser: async (email: string, role: AppUser['role'], title: string, name: string): Promise<void> => {
-    // We use email as ID for the whitelist/placeholder if we don't have UID yet.
-    // BUT, AuthContext looks up by UID.
-    // Strategy: We can't easily "create" a user without them signing in or using Admin SDK.
-    // Alternative: We create a "whitelisted_users" collection or just rely on them signing up 
-    // and us editing them later. 
-    // BETTER: Create a document in 'users' with a generated ID (or email as ID if we change lookup logic, but that breaks current UID logic).
-    // COMPROMISE: We will just create a placeholder doc. Since we don't know the UID they will get from Google/Auth,
-    // we can't pre-populate the 'users/{uid}' doc.
-    // 
-    // REVISED STRATEGY for Client-Side Only:
-    // We cannot "invite" effectively without Admin SDK.
-    // We will stick to "Manage Existing Users" for now.
-    // If the user insists on "Invite", we can add a "whitelisted_emails" collection that AuthContext checks.
-    //
-    // Let's stick to updating/deleting EXISTING users for this step as per the prompt's "Manage roles" focus.
-    // I will add the functions but note the limitation.
-    // Actually, I'll implement a 'soft' invite where we just store a record that doesn't do much yet, 
-    // OR just skip 'invite' for this iteration and focus on managing the list.
-    //
-    // Let's implement 'deleteUser' (Firestore doc delete).
+    console.log("Invite user not implemented client-side", { email, role, title, name });
   },
 
   deleteUser: async (uid: string): Promise<void> => {
     await deleteDoc(doc(db, "users", uid));
   },
 
-  // --- Export Helpers ---
-  getAllCaseNotes: async (): Promise<CaseNote[]> => {
-    const q = query(collection(db, "caseNotes"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CaseNote));
-  },
+  mergeUserData: async (sourceUid: string, targetUid: string): Promise<{ clients: number, tasks: number, notes: number, workshops: number }> => {
+    console.log(`Merging data from ${sourceUid} to ${targetUid}`);
+    let counts = { clients: 0, tasks: 0, notes: 0, workshops: 0 };
 
-  getAllISPs: async (): Promise<ISP[]> => {
-    const q = query(collection(db, "isps"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ISP));
+    // 1. Migrate Clients (assignedAdminId, createdBy, lastModifiedBy)
+    const clientFields = ['metadata.assignedAdminId', 'metadata.createdBy', 'metadata.lastModifiedBy'];
+    for (const field of clientFields) {
+      const q = query(collection(db, "clients"), where(field, "==", sourceUid));
+      const snapshot = await getDocs(q);
+      counts.clients += snapshot.size;
+      const updates = snapshot.docs.map(doc => updateDoc(doc.ref, { [field]: targetUid }));
+      await Promise.all(updates);
+    }
+
+    // 2. Migrate Tasks
+    const tasksQuery = query(collection(db, "tasks"), where("assignedToId", "==", sourceUid));
+    const tasksSnapshot = await getDocs(tasksQuery);
+    counts.tasks += tasksSnapshot.size;
+    await Promise.all(tasksSnapshot.docs.map(doc => updateDoc(doc.ref, { assignedToId: targetUid })));
+
+    // 3. Migrate Case Notes
+    const notesQuery = query(collection(db, "caseNotes"), where("staffId", "==", sourceUid));
+    const notesSnapshot = await getDocs(notesQuery);
+    counts.notes += notesSnapshot.size;
+    await Promise.all(notesSnapshot.docs.map(doc => updateDoc(doc.ref, { staffId: targetUid })));
+
+    // 4. Migrate Workshops
+    const workshopsQuery = query(collection(db, "workshops"), where("assignedToId", "==", sourceUid));
+    const workshopsSnapshot = await getDocs(workshopsQuery);
+    counts.workshops += workshopsSnapshot.size;
+    await Promise.all(workshopsSnapshot.docs.map(doc => updateDoc(doc.ref, { assignedToId: targetUid })));
+
+    console.log("Merge completed:", counts);
+    return counts;
   },
 
   getTasks: async (): Promise<Task[]> => {

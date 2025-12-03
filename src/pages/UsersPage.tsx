@@ -11,6 +11,11 @@ const UsersPage: React.FC = () => {
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<AppUser>>({});
 
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [mergeSourceId, setMergeSourceId] = useState('');
+    const [mergeTargetId, setMergeTargetId] = useState('');
+    const [mergeStatus, setMergeStatus] = useState<string | null>(null);
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -73,6 +78,37 @@ const UsersPage: React.FC = () => {
         }
     };
 
+    const handleMergeUsers = async () => {
+        if (!mergeSourceId || !mergeTargetId) {
+            alert("Please select both a source and target user.");
+            return;
+        }
+        if (mergeSourceId === mergeTargetId) {
+            alert("Source and Target users cannot be the same.");
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to merge all data from the Source user to the Target user? This action cannot be undone.`)) {
+            return;
+        }
+
+        setMergeStatus("Merging...");
+        try {
+            const result = await api.mergeUserData(mergeSourceId, mergeTargetId);
+            setMergeStatus(`Merge Complete! Moved: ${result.clients} clients, ${result.tasks} tasks, ${result.notes} notes, ${result.workshops} workshops.`);
+            alert(`Merge Successful!\n\nMoved:\n- ${result.clients} Clients\n- ${result.tasks} Tasks\n- ${result.notes} Notes\n- ${result.workshops} Workshops\n\nYou can now safely delete the empty Source user.`);
+            setShowMergeModal(false);
+            setMergeSourceId('');
+            setMergeTargetId('');
+            setMergeStatus(null);
+            fetchUsers(); // Refresh to see any updates (though user list shouldn't change yet)
+        } catch (error) {
+            console.error("Merge failed:", error);
+            setMergeStatus("Merge Failed. Check console.");
+            alert("Merge failed. Please check the console for details.");
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setEditForm(prev => ({ ...prev, [name]: value }));
@@ -88,8 +124,76 @@ const UsersPage: React.FC = () => {
         <div className="p-6 max-w-6xl mx-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-                {/* Invite button could go here in future */}
+                <button
+                    onClick={() => setShowMergeModal(true)}
+                    className="bg-[#404E3B] text-white px-4 py-2 rounded hover:bg-[#333f2f] flex items-center"
+                >
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Merge Users
+                </button>
             </div>
+
+            {/* Merge Modal */}
+            {showMergeModal && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                    <div className="bg-white p-5 rounded-lg shadow-xl w-96">
+                        <h2 className="text-xl font-bold mb-4">Merge User Accounts</h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Move all data from one user to another. Useful for fixing duplicate accounts.
+                        </p>
+
+                        <div className="mb-4">
+                            <label className="block text-gray-700 text-sm font-bold mb-2">From (Source)</label>
+                            <select
+                                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                value={mergeSourceId}
+                                onChange={(e) => setMergeSourceId(e.target.value)}
+                            >
+                                <option value="">Select Source User</option>
+                                {users.map(u => (
+                                    <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-gray-700 text-sm font-bold mb-2">To (Target)</label>
+                            <select
+                                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                value={mergeTargetId}
+                                onChange={(e) => setMergeTargetId(e.target.value)}
+                            >
+                                <option value="">Select Target User</option>
+                                {users.map(u => (
+                                    <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {mergeStatus && (
+                            <div className="mb-4 text-sm font-semibold text-blue-600">
+                                {mergeStatus}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end space-x-2">
+                            <button
+                                onClick={() => setShowMergeModal(false)}
+                                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleMergeUsers}
+                                disabled={!!mergeStatus && mergeStatus === "Merging..."}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                            >
+                                Merge Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -135,8 +239,8 @@ const UsersPage: React.FC = () => {
                                         </select>
                                     ) : (
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-green-100 text-green-800' :
-                                                user.role === 'viewer' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-yellow-100 text-yellow-800'
+                                            user.role === 'viewer' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-yellow-100 text-yellow-800'
                                             }`}>
                                             {user.role}
                                         </span>
