@@ -32,11 +32,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("AuthContext: onAuthStateChanged triggered", firebaseUser ? firebaseUser.uid : "No user");
       try {
         if (firebaseUser) {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
           const email = firebaseUser.email || '';
+          console.log(`AuthContext: Checking user doc for ${firebaseUser.uid} (email: ${email}). Exists: ${userDocSnap.exists()}`);
 
           // Check if this user is in our pre-defined staff list (for initial bootstrap only)
           const staffConfig = STAFF_ROLES.find(s => s.email.toLowerCase() === email.toLowerCase());
@@ -45,10 +47,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
+            console.log("AuthContext: User found in Firestore", userData);
 
             // Check if we need to update the user's role/title based on config (Bootstrap/Override)
             // This ensures that if we change roles in staff.ts, they propagate to Firestore on next login
             if (staffConfig && (userData.role !== staffConfig.role || userData.title !== staffConfig.title)) {
+              console.log("AuthContext: Updating staff role/title from config");
               await setDoc(userDocRef, {
                 ...userData,
                 role: staffConfig.role,
@@ -73,6 +77,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               };
             }
           } else {
+            console.log("AuthContext: User doc not found. Checking for legacy record...");
             // User document does not exist for this UID.
             // Check if there is a legacy user record with the same email but different ID.
             const q = query(collection(db, 'users'), where('email', '==', email));
@@ -107,9 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               } catch (err) {
                 console.error("AuthContext: Data migration failed", err);
               }
-              // We continue to create the new user even if migration fails partially, 
-              // but maybe we shouldn't delete the old one? 
-              // Let's proceed but log error.
+              // We continue to create the new user even if migration fails partially
 
               // Use legacy data, but update role/title if staff config exists
               appUser = {
@@ -121,6 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               };
 
               // Create new doc with correct UID
+              console.log("AuthContext: Creating new user doc", appUser);
               await setDoc(userDocRef, {
                 ...legacyData, // Keep other fields like createdAt if they exist
                 name: appUser.name,
@@ -132,9 +136,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               });
 
               // Delete the old duplicate record
-              await deleteDoc(doc(db, 'users', legacyDoc.id));
+              try {
+                console.log("AuthContext: Deleting legacy doc", legacyId);
+                await deleteDoc(doc(db, 'users', legacyDoc.id));
+              } catch (deleteErr) {
+                console.error("AuthContext: Failed to delete legacy doc", deleteErr);
+                // Do not block login if deletion fails
+              }
 
             } else {
+              console.log("AuthContext: No legacy record found. Creating new user.");
               // New user - check staff config for bootstrap, otherwise default to viewer/pending
               appUser = {
                 uid: firebaseUser.uid,
@@ -153,7 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               });
             }
           }
-          console.log("AuthContext: User set", appUser);
+          console.log("AuthContext: User set successfully", appUser);
           setUser(appUser);
         } else {
           console.log("AuthContext: No user");
