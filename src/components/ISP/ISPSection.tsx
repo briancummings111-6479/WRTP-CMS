@@ -363,6 +363,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 </div>
             }>
                 <div className="space-y-6">
+                    {/* Attachments Section */}
                     <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>

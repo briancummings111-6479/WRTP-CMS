@@ -32,6 +32,11 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     const [durationMinutes, setDurationMinutes] = useState<number>(15);
     const [attachments, setAttachments] = useState<{ fileName: string; storageUrl: string }[]>([]);
     const [submitting, setSubmitting] = useState(false);
+
+    // New state for Author dropdown
+    const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
+    const [selectedAuthorId, setSelectedAuthorId] = useState<string>('');
+
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,9 +48,30 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         setContactMethod('Hartnell Office');
         setDurationMinutes(15);
         setAttachments([]);
+        // Reset author to current user if available
+        if (user) setSelectedAuthorId(user.uid);
         if (editorRef.current) editorRef.current.innerHTML = '';
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
+
+    useEffect(() => {
+        const fetchStaff = async () => {
+            try {
+                const staff = await api.getStaffUsers();
+                setStaffMembers(staff.map(s => ({ uid: s.uid, name: s.name })));
+            } catch (error) {
+                console.error("Failed to fetch staff members", error);
+            }
+        };
+        fetchStaff();
+    }, []);
+
+    // Set default author when user loads
+    useEffect(() => {
+        if (user && !selectedAuthorId && !isEditing) {
+            setSelectedAuthorId(user.uid);
+        }
+    }, [user, selectedAuthorId, isEditing]);
 
     useEffect(() => {
         if (isEditing && noteToEdit) {
@@ -59,6 +85,10 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
             setContactMethod(noteToEdit.contactMethod);
             setDurationMinutes(noteToEdit.durationMinutes);
             setAttachments(noteToEdit.attachments || []);
+            // Set author from existing note
+            if (noteToEdit.staffId) {
+                setSelectedAuthorId(noteToEdit.staffId);
+            }
             if (editorRef.current) {
                 editorRef.current.innerHTML = noteToEdit.noteBody;
             }
@@ -97,6 +127,10 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
 
         try {
             const timestamp = new Date(noteDate + 'T00:00:00').getTime();
+
+            // Find selected author details
+            const selectedAuthor = staffMembers.find(s => s.uid === selectedAuthorId) || { uid: user.uid, name: user.name };
+
             if (isEditing && noteToEdit) {
                 const updatedNote: CaseNote = {
                     ...noteToEdit,
@@ -107,16 +141,16 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     durationMinutes,
                     noteBody,
                     attachments,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                 };
                 await api.updateCaseNote(updatedNote);
             } else {
                 const newNoteData = {
                     clientId,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                     noteType,
                     urgency,
@@ -141,11 +175,26 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     return (
         <Card title={isEditing ? 'Edit Case Note' : 'Add New Case Note'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     {/* Note Date */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Note Date</label>
                         <input type="date" value={noteDate} onChange={e => setNoteDate(e.target.value)} className="form-input" required />
+                    </div>
+                    {/* Author */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Author</label>
+                        <select
+                            value={selectedAuthorId}
+                            onChange={e => setSelectedAuthorId(e.target.value)}
+                            className="form-input"
+                        >
+                            {staffMembers.map(member => (
+                                <option key={member.uid} value={member.uid}>
+                                    {member.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                     {/* Note Type */}
                     <div>
