@@ -108,6 +108,7 @@ const ClientDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isp, setIsp] = useState<ISP | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -168,8 +169,9 @@ const ClientDashboardPage: React.FC = () => {
         // --- Initialize audit checklist state ---
         setAuditChecklistData(clientData.auditChecklist);
       }
-    } catch (error) {
-      console.error("Failed to fetch client data:", error);
+    } catch (err: any) {
+      console.error("Failed to fetch client data:", err);
+      setError(err.message || "An error occurred while fetching client data.");
     } finally {
       console.log("Fetch complete, setting loading false");
       setLoading(false);
@@ -388,7 +390,8 @@ const ClientDashboardPage: React.FC = () => {
   ];
 
   if (loading) return <div>Loading client data...</div>;
-  if (!client) return <div>Client not found</div>;
+  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
+  if (!client) return <div className="p-4">Client not found (ID: {clientId})</div>;
 
   const profile = client.profile;
   const contactInfo = client.contactInfo;
