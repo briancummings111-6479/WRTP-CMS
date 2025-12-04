@@ -502,7 +502,7 @@ const ClientDashboardPage: React.FC = () => {
 
           {/* Right Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg shadow">
+            <div className="bg-[#E6E6E6] rounded-lg shadow border border-[#d1d1d1]">
               <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
                   {tabs.map((tab) => (
