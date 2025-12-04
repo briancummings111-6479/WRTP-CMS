@@ -35,7 +35,7 @@ const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
 
 const TableView = ({ headers, data, renderRow }: { headers: string[], data: any[], renderRow: (item: any) => React.ReactNode }) => (
     <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-sm bg-white">
             <thead className="bg-gray-100">
                 <tr>{headers.map(h => <th key={h} className="p-2 text-left font-semibold text-gray-600">{h}</th>)}</tr>
             </thead>
@@ -366,7 +366,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         <div className="space-y-6">
             {/* Attachments Section - Moved outside Card to avoid nesting issues */}
             <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
-            
+
             <Card title="Individual Service Plan" titleAction={
                 <div className="flex items-center space-x-2 no-print">
                     <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>

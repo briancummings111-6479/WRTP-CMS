@@ -530,38 +530,36 @@ const ClientDashboardPage: React.FC = () => {
                 {activeTab === 'ISP' && <ISPSection client={client} isp={isp} onIspUpdate={handleIspUpdate} />}
 
                 {activeTab === 'Audit Checklist' && auditChecklistData && (
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">Audit Checklist</h3>
-                      {!isEditingAuditChecklist ? (
+                  <Card title="Audit Checklist" titleAction={
+                    !isEditingAuditChecklist ? (
+                      <button
+                        onClick={() => setIsEditingAuditChecklist(true)}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        <Edit className="h-4 w-4 mr-2 text-gray-500" />
+                        Edit
+                      </button>
+                    ) : (
+                      <div className="flex justify-end space-x-3">
                         <button
-                          onClick={() => setIsEditingAuditChecklist(true)}
-                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                          type="button"
+                          onClick={handleAuditChecklistCancel}
+                          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                         >
-                          <Edit className="h-4 w-4 mr-2 text-gray-500" />
-                          Edit
+                          Cancel
                         </button>
-                      ) : (
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={handleAuditChecklistCancel}
-                            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            onClick={handleAuditChecklistSave}
-                            disabled={isAuditChecklistSaving}
-                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
-                          >
-                            <Save className="h-4 w-4 mr-2" />
-                            {isAuditChecklistSaving ? 'Saving...' : 'Save Changes'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        <button
+                          type="submit"
+                          onClick={handleAuditChecklistSave}
+                          disabled={isAuditChecklistSaving}
+                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          {isAuditChecklistSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    )
+                  }>
                     <div className="space-y-6">
                       {/* Render each section */}
                       {(Object.keys(auditChecklistData) as Array<keyof AuditChecklist>).map(sectionKey => {
@@ -575,7 +573,7 @@ const ClientDashboardPage: React.FC = () => {
                               {sectionKey === 'isp' ? 'ISP' : sectionKey === 'caseNotes' ? 'Case Notes' : sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)}
                             </legend>
                             <div className="p-4 overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200">
+                              <table className="min-w-full divide-y divide-gray-200 bg-white">
                                 <thead>
                                   <tr>
                                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Item</th>
@@ -601,163 +599,164 @@ const ClientDashboardPage: React.FC = () => {
                         );
                       })}
                     </div>
-                  </div>
+                  </Card>
                 )}
 
-                {/* ----- 'Certificates and CTE' Tab Logic ----- */}
-                {activeTab === 'Certificates and CTE' && trainingData && (
-                  <div>
-                    {!isEditingTraining ? (
-                      // --- DISPLAY MODE ---
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-medium text-gray-900">Training Status</h3>
-                          <button
-                            onClick={() => setIsEditingTraining(true)}
-                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                          >
-                            <Edit className="h-4 w-4 mr-2 text-gray-500" />
-                            Edit
-                          </button>
+              {/* ----- 'Certificates and CTE' Tab Logic ----- */}
+              {activeTab === 'Certificates and CTE' && trainingData && (
+                <Card title="Training Status" titleAction={
+                  !isEditingTraining ? (
+                    <button
+                      onClick={() => setIsEditingTraining(true)}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <Edit className="h-4 w-4 mr-2 text-gray-500" />
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={handleTrainingCancel}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        onClick={handleTrainingSave}
+                        disabled={isTrainingSaving}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {isTrainingSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )
+                }>
+                  {!isEditingTraining ? (
+                    // --- DISPLAY MODE ---
+                    <div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-md font-medium text-gray-800 mb-2">Certifications</h4>
+                          <div className="space-y-2">
+                            {certificationMap.filter(cert => trainingData[cert.key]).length > 0 ? (
+                              certificationMap.map(cert =>
+                                trainingData[cert.key] && <DisplayListItem key={cert.key} label={cert.label} />
+                              )
+                            ) : <p className="text-sm text-gray-500">No certifications on file.</p>}
+
+                            {trainingData.otherCertificates && (
+                              <div className="pl-8 pt-1">
+                                <p className="text-sm text-gray-800 font-medium">Other: <span className="font-normal">{trainingData.otherCertificates}</span></p>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-md font-medium text-gray-800 mb-2">Certifications</h4>
-                            <div className="space-y-2">
-                              {certificationMap.filter(cert => trainingData[cert.key]).length > 0 ? (
-                                certificationMap.map(cert =>
-                                  trainingData[cert.key] && <DisplayListItem key={cert.key} label={cert.label} />
-                                )
-                              ) : <p className="text-sm text-gray-500">No certifications on file.</p>}
+                        <hr className="border-gray-200" />
 
-                              {trainingData.otherCertificates && (
-                                <div className="pl-8 pt-1">
-                                  <p className="text-sm text-gray-800 font-medium">Other: <span className="font-normal">{trainingData.otherCertificates}</span></p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                        <div>
+                          <h4 className="text-md font-medium text-gray-800 mb-2">Enrolled CTE Programs</h4>
+                          <div className="space-y-2">
+                            {cteProgramMap.filter(cte => trainingData[cte.key]).length > 0 ? (
+                              cteProgramMap.map(cte =>
+                                trainingData[cte.key] && <DisplayListItem key={cte.key} label={cte.label} />
+                              )
+                            ) : <p className="text-sm text-gray-500">No CTE programs enrolled.</p>}
 
-                          <hr className="border-gray-200" />
-
-                          <div>
-                            <h4 className="text-md font-medium text-gray-800 mb-2">Enrolled CTE Programs</h4>
-                            <div className="space-y-2">
-                              {cteProgramMap.filter(cte => trainingData[cte.key]).length > 0 ? (
-                                cteProgramMap.map(cte =>
-                                  trainingData[cte.key] && <DisplayListItem key={cte.key} label={cte.label} />
-                                )
-                              ) : <p className="text-sm text-gray-500">No CTE programs enrolled.</p>}
-
-                              {trainingData.otherCteProgram && (
-                                <div className="pl-8 pt-1">
-                                  <p className="text-sm text-gray-800 font-medium">Other: <span className="font-normal">{trainingData.otherCteProgram}</span></p>
-                                </div>
-                              )}
-                            </div>
+                            {trainingData.otherCteProgram && (
+                              <div className="pl-8 pt-1">
+                                <p className="text-sm text-gray-800 font-medium">Other: <span className="font-normal">{trainingData.otherCteProgram}</span></p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      // --- EDIT MODE ---
-                      <form onSubmit={(e) => { e.preventDefault(); handleTrainingSave(); }}>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Training Status</h3>
+                    </div>
+                  ) : (
+                    // --- EDIT MODE ---
+                    <form onSubmit={(e) => { e.preventDefault(); handleTrainingSave(); }}>
 
-                        <div className="space-y-6">
-                          {/* Certifications Section */}
-                          <fieldset className="space-y-4 p-4 border rounded-md">
-                            <legend className="text-md font-medium text-gray-700 px-1">Certifications</legend>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                              {certificationMap.map(cert => (
-                                <CheckboxInput
-                                  key={cert.key}
-                                  label={cert.label}
-                                  name={cert.key}
-                                  checked={Boolean(trainingData && trainingData[cert.key])}
-                                  onChange={handleTrainingChange}
-                                />
-                              ))}
-                            </div>
-                            <div className="pt-2">
-                              <label htmlFor="otherCertificates" className="block text-sm font-medium text-gray-700">Other Certificates</label>
-                              <input
-                                type="text"
-                                id="otherCertificates"
-                                name="otherCertificates"
-                                value={trainingData.otherCertificates || ''}
+                      <div className="space-y-6">
+                        {/* Certifications Section */}
+                        <fieldset className="space-y-4 p-4 border rounded-md">
+                          <legend className="text-md font-medium text-gray-700 px-1">Certifications</legend>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {certificationMap.map(cert => (
+                              <CheckboxInput
+                                key={cert.key}
+                                label={cert.label}
+                                name={cert.key}
+                                checked={Boolean(trainingData && trainingData[cert.key])}
                                 onChange={handleTrainingChange}
-                                className="form-input mt-1"
-                                placeholder="e.g., Forklift"
                               />
-                            </div>
-                          </fieldset>
-
-                          {/* CTE Programs Section */}
-                          <fieldset className="space-y-4 p-4 border rounded-md">
-                            <legend className="text-md font-medium text-gray-700 px-1">Enrolled CTE Programs</legend>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4">
-                              {cteProgramMap.map(cte => (
-                                <CheckboxInput
-                                  key={cte.key}
-                                  label={cte.label}
-                                  name={cte.key}
-                                  checked={Boolean(trainingData && trainingData[cte.key])}
-                                  onChange={handleTrainingChange}
-                                />
-                              ))}
-                            </div>
-                            <div className="pt-2">
-                              <label htmlFor="otherCteProgram" className="block text-sm font-medium text-gray-700">Other CTE Program</label>
-                              <input
-                                type="text"
-                                id="otherCteProgram"
-                                name="otherCteProgram"
-                                value={trainingData.otherCteProgram || ''}
-                                onChange={handleTrainingChange}
-                                className="form-input mt-1"
-                                placeholder="e.g., IT, Media"
-                              />
-                            </div>
-                          </fieldset>
-
-                          {/* Save/Cancel Buttons */}
-                          <div className="flex justify-end space-x-3">
-                            <button
-                              type="button"
-                              onClick={handleTrainingCancel}
-                              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={isTrainingSaving}
-                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
-                            >
-                              <Save className="h-4 w-4 mr-2" />
-                              {isTrainingSaving ? 'Saving...' : 'Save Changes'}
-                            </button>
+                            ))}
                           </div>
-                        </div>
-                      </form>
-                    )}
-                    {/* Shared style for form inputs */}
-                    <style>{`
+                          <div className="pt-2">
+                            <label htmlFor="otherCertificates" className="block text-sm font-medium text-gray-700">Other Certificates</label>
+                            <input
+                              type="text"
+                              id="otherCertificates"
+                              name="otherCertificates"
+                              value={trainingData.otherCertificates || ''}
+                              onChange={handleTrainingChange}
+                              className="form-input mt-1"
+                              placeholder="e.g., Forklift"
+                            />
+                          </div>
+                        </fieldset>
+
+                        {/* CTE Programs Section */}
+                        <fieldset className="space-y-4 p-4 border rounded-md">
+                          <legend className="text-md font-medium text-gray-700 px-1">Enrolled CTE Programs</legend>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4">
+                            {cteProgramMap.map(cte => (
+                              <CheckboxInput
+                                key={cte.key}
+                                label={cte.label}
+                                name={cte.key}
+                                checked={Boolean(trainingData && trainingData[cte.key])}
+                                onChange={handleTrainingChange}
+                              />
+                            ))}
+                          </div>
+                          <div className="pt-2">
+                            <label htmlFor="otherCteProgram" className="block text-sm font-medium text-gray-700">Other CTE Program</label>
+                            <input
+                              type="text"
+                              id="otherCteProgram"
+                              name="otherCteProgram"
+                              value={trainingData.otherCteProgram || ''}
+                              onChange={handleTrainingChange}
+                              className="form-input mt-1"
+                              placeholder="e.g., IT, Media"
+                            />
+                          </div>
+                        </fieldset>
+
+                        {/* Save/Cancel Buttons */}
+                      </div>
+                    </form>
+                  )}
+                  {/* Shared style for form inputs */}
+                  <style>{`
                           .form-input { display: block; width: 100%; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; }
                           .form-input:focus { outline: none; border-color: #404E3B; box-shadow: 0 0 0 2px rgba(64, 78, 59, 0.3); }
                       `}</style>
-                  </div>
-                )}
+                </Card>
+              )}
 
-                {activeTab === 'Files' && <AttachmentsSection clientId={client.id} />}
-              </div>
+              {activeTab === 'Files' && <AttachmentsSection clientId={client.id} />}
             </div>
           </div>
         </div>
       </div>
+    </div >
 
-      {client && (
+      { client && (
         <EditClientModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
@@ -766,7 +765,8 @@ const ClientDashboardPage: React.FC = () => {
           onDelete={handleDeleteClient}
           staff={staff}
         />
-      )}
+      )
+}
     </>
   );
 };

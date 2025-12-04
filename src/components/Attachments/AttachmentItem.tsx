@@ -25,7 +25,7 @@ const formatBytes = (bytes: number, decimals = 2) => {
 
 const AttachmentItem: React.FC<AttachmentItemProps> = ({ attachment, onDelete }) => {
     return (
-        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100">
+        <div className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200 hover:bg-gray-50">
             <div className="flex items-center space-x-4 min-w-0">
                 <FileTypeIcon fileType={attachment.fileType} />
                 <div className="min-w-0">
