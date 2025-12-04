@@ -196,14 +196,8 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                             ))}
                         </select>
                     </div>
-                    {/* Note Type */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Note Type</label>
-                        <select value={noteType} onChange={e => setNoteType(e.target.value as CaseNote['noteType'])} className="form-input">
-                            <option>Case Note</option>
-                            <option>Contact Note</option>
-                        </select>
-                    </div>
+                    {/* Note Type - REMOVED */}
+
                     {/* Urgency */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Urgency</label>

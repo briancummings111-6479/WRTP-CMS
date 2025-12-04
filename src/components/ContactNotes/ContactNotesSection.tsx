@@ -9,7 +9,7 @@ interface ContactNotesSectionProps {
 }
 
 const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) => {
-    const { currentUser } = useAuth();
+    const { user } = useAuth();
     const [notes, setNotes] = useState<CaseNote[]>([]);
     const [loading, setLoading] = useState(true);
     const [newNoteText, setNewNoteText] = useState('');
@@ -39,14 +39,14 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
     }, [fetchNotes]);
 
     const handleSave = async () => {
-        if (!newNoteText.trim() || !currentUser) return;
+        if (!newNoteText.trim() || !user) return;
 
         setIsSaving(true);
         try {
             const newNote: Omit<CaseNote, 'id'> = {
                 clientId,
-                staffId: currentUser.uid,
-                staffName: currentUser.name || currentUser.email || 'Unknown',
+                staffId: user.uid,
+                staffName: user.name || user.email || 'Unknown',
                 noteDate: Date.now(),
                 noteType: 'Contact Note',
                 urgency: 'Green', // Default
@@ -137,7 +137,7 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 align-top">
-                                {currentUser?.name || 'Me'}
+                                {user?.name || 'Me'}
                             </td>
                         </tr>
                     </tbody>

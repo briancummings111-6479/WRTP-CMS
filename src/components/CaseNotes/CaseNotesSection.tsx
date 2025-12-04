@@ -18,7 +18,8 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
     const fetchNotes = useCallback(async () => {
         setLoading(true);
         const notesData = await api.getCaseNotesByClientId(clientId);
-        setNotes(notesData);
+        // Filter to only show 'Case Note' type, as 'Contact Note' has its own tab
+        setNotes(notesData.filter(n => n.noteType === 'Case Note'));
         setLoading(false);
     }, [clientId]);
 
