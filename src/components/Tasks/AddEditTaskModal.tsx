@@ -84,15 +84,15 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start p-4 pt-16" aria-modal="true" role="dialog">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-        <div className="flex justify-between items-center p-4 border-b">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-800">{taskToEdit ? 'Edit Task' : 'Add New Task'} for {clientName}</h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200" aria-label="Close modal">
             <X className="h-6 w-6 text-gray-600" />
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="p-6 space-y-4 overflow-y-auto flex-1">
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-gray-700">Description</label>
               <textarea id="title" value={title} onChange={(e) => setTitle(e.target.value)} rows={3} className="form-input mt-1" required />
@@ -139,7 +139,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
               </div>
             </div>
           </div>
-          <div className="flex justify-end items-center p-4 border-t bg-gray-50">
+          <div className="flex justify-end items-center p-4 border-t bg-gray-50 flex-shrink-0">
             <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 mr-3">Cancel</button>
             <button type="submit" disabled={isSaving} className="inline-flex justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89]">
               {isSaving ? 'Saving...' : 'Save Task'}
