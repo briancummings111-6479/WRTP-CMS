@@ -28,6 +28,10 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
             const filteredData = category
                 ? data.filter(a => a.category === category)
                 : data;
+
+            // Sort alphabetically by fileName
+            filteredData.sort((a, b) => a.fileName.localeCompare(b.fileName));
+
             setAttachments(filteredData);
         } catch (error) {
             console.error("Failed to fetch attachments:", error);
