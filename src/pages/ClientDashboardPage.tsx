@@ -444,15 +444,17 @@ const ClientDashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-6">
-            <Card title="Client Information">
-              <div className="absolute top-4 right-4">
+            <Card
+              title="Client Information"
+              titleAction={
                 <button
                   onClick={() => setIsEditModalOpen(true)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-500 hover:text-gray-700"
                 >
                   <Edit className="h-5 w-5" />
                 </button>
-              </div>
+              }
+            >
               <div className="space-y-3">
                 <div className="flex items-center text-gray-700">
                   <User className="h-5 w-5 mr-3 text-gray-400" />
