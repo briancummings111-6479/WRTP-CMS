@@ -227,7 +227,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </div>
                     {/* Contact Method */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Contact Method</label>
+                        <label className="block text-sm font-medium text-gray-700">Method</label>
                         <select value={contactMethod} onChange={e => setContactMethod(e.target.value as CaseNote['contactMethod'])} className="form-input">
                             <option>Hartnell Office</option>
                             <option>CHYBA Office</option>
