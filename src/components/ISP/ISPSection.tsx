@@ -356,6 +356,9 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
     return (
         <div className="space-y-6">
+            {/* Attachments Section - Moved outside Card to avoid nesting issues */}
+            <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
+
             <Card title="Individual Service Plan" titleAction={
                 <div className="flex items-center space-x-2 no-print">
                     <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>
@@ -363,8 +366,6 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 </div>
             }>
                 <div className="space-y-6">
-                    {/* Attachments Section */}
-                    <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <h4 className="font-semibold">ISP Date</h4>
