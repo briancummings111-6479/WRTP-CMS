@@ -55,6 +55,54 @@ interface AuditChecklistRowProps {
   isEditing: boolean;
 }
 
+const DEFAULT_AUDIT_ITEMS: AuditChecklistItem[] = [
+  { id: "1.1", label: "1.1 WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "1.2", label: "1.2 Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "1.3", label: "1.3 Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "1.5", label: "1.5 Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "1.6", label: "1.6 WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "1.9", label: "1.9 Authorization of Release", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "2.1", label: "2.1 Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "2.2", label: "2.2 Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+  { id: "referrals", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" },
+];
+
+const migrateAuditChecklist = (oldChecklist: any): AuditChecklistItem[] => {
+  if (Array.isArray(oldChecklist)) return oldChecklist;
+
+  const newChecklist = [...DEFAULT_AUDIT_ITEMS];
+
+  // Helper to find and copy data from old structure
+  const copyData = (section: string, oldId: string, newId: string) => {
+    if (oldChecklist && oldChecklist[section]) {
+      const oldItem = oldChecklist[section].find((i: any) => i.id === oldId);
+      if (oldItem) {
+        const newItemIndex = newChecklist.findIndex(i => i.id === newId);
+        if (newItemIndex !== -1) {
+          newChecklist[newItemIndex] = {
+            ...newChecklist[newItemIndex],
+            complete: oldItem.complete,
+            uploaded: oldItem.uploaded,
+            notes: oldItem.notes
+          };
+        }
+      }
+    }
+  };
+
+  copyData('onboarding', '1.1', '1.1');
+  copyData('onboarding', '1.2', '1.2');
+  copyData('onboarding', '1.3', '1.3');
+  copyData('onboarding', '1.5', '1.5');
+  copyData('onboarding', '1.6', '1.6');
+  copyData('onboarding', '1.9', '1.9');
+  copyData('isp', '2.1', '2.1');
+  copyData('isp', '2.2', '2.2');
+  copyData('caseNotes', '3.4', 'referrals'); // Assuming 3.4 was Referrals
+
+  return newChecklist;
+};
+
 const AuditChecklistRow: React.FC<AuditChecklistRowProps> = ({ item, onChange, isEditing }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -62,15 +110,8 @@ const AuditChecklistRow: React.FC<AuditChecklistRowProps> = ({ item, onChange, i
   };
 
   return (
-    <tr className={item.present ? 'bg-green-50' : ''}>
+    <tr className={item.complete ? 'bg-green-50' : ''}>
       <td className="py-2 pl-2 text-sm text-gray-900">{item.label}</td>
-      <td className="py-2 px-2 text-center">
-        {isEditing ? (
-          <input type="checkbox" name="present" checked={item.present} onChange={handleChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
-        ) : (
-          item.present ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <X className="h-5 w-5 text-red-500 mx-auto" />
-        )}
-      </td>
       <td className="py-2 px-2 text-center">
         {isEditing ? (
           <input type="checkbox" name="complete" checked={item.complete} onChange={handleChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
@@ -79,6 +120,7 @@ const AuditChecklistRow: React.FC<AuditChecklistRowProps> = ({ item, onChange, i
         )}
       </td>
       <td className="py-2 px-2 text-center">
+        {/* Uploaded is auto-checked based on files, but maybe allow manual override? User said "The Audit Checklist should look at the files uploaded." implying automation. I'll make it read-only or disabled in edit mode if it's purely automated, but usually manual override is good. I'll leave it editable. */}
         {isEditing ? (
           <input type="checkbox" name="uploaded" checked={item.uploaded} onChange={handleChange} className="h-4 w-4 text-[#404E3B] border-gray-300 rounded focus:ring-[#404E3B]" />
         ) : (
@@ -96,7 +138,7 @@ const AuditChecklistRow: React.FC<AuditChecklistRowProps> = ({ item, onChange, i
             placeholder="Notes..."
           />
         ) : (
-          <span className="text-sm text-gray-600">{item.notes || (isEditing ? '' : 'N/A')}</span>
+          <span className="text-sm text-gray-600">{item.notes || (isEditing ? '' : '')}</span>
         )}
       </td>
     </tr>
@@ -167,7 +209,8 @@ const ClientDashboardPage: React.FC = () => {
       if (clientData) {
         setTrainingData(clientData.training);
         // --- Initialize audit checklist state ---
-        setAuditChecklistData(clientData.auditChecklist);
+        // --- Initialize audit checklist state ---
+        setAuditChecklistData(migrateAuditChecklist(clientData.auditChecklist));
       }
     } catch (err: any) {
       console.error("Failed to fetch client data:", err);
@@ -185,7 +228,7 @@ const ClientDashboardPage: React.FC = () => {
   useEffect(() => {
     if (client) {
       setTrainingData(client.training);
-      setAuditChecklistData(client.auditChecklist);
+      setAuditChecklistData(migrateAuditChecklist(client.auditChecklist));
     }
   }, [client]);
 
@@ -264,22 +307,16 @@ const ClientDashboardPage: React.FC = () => {
 
   // --- NEW Handlers for Audit Checklist Form ---
   const handleAuditChecklistChange = (
-    section: keyof AuditChecklist,
     itemId: string,
     field: keyof AuditChecklistItem,
     value: string | boolean
   ) => {
     setAuditChecklistData(prev => {
       if (!prev) return null;
-
-      const newSectionData = prev[section].map(item =>
+      // prev is now AuditChecklistItem[]
+      return prev.map(item =>
         item.id === itemId ? { ...item, [field]: value } : item
       );
-
-      return {
-        ...prev,
-        [section]: newSectionData
-      };
     });
   };
 
@@ -310,64 +347,35 @@ const ClientDashboardPage: React.FC = () => {
     if (!client || !auditChecklistData) return;
 
     let hasChanges = false;
-    // Deep copy to avoid direct mutation if we were using a more complex state manager, 
-    // but here we just need a new object reference for the state update.
-    // We'll map over sections to create a new structure if needed.
-    const newChecklist = { ...auditChecklistData };
+    const newChecklist = [...auditChecklistData];
 
-    const checkItem = (section: keyof AuditChecklist, id: string, isPresent: boolean) => {
-      const sectionItems = newChecklist[section];
-      const itemIndex = sectionItems.findIndex(i => i.id === id);
+    const checkItem = (id: string, isUploaded: boolean) => {
+      const itemIndex = newChecklist.findIndex(i => i.id === id);
       if (itemIndex !== -1) {
-        if (sectionItems[itemIndex].present !== isPresent) {
-          // Create a new array for the section to ensure immutability
-          newChecklist[section] = [...sectionItems];
-          newChecklist[section][itemIndex] = { ...sectionItems[itemIndex], present: isPresent };
+        if (newChecklist[itemIndex].uploaded !== isUploaded) {
+          newChecklist[itemIndex] = { ...newChecklist[itemIndex], uploaded: isUploaded };
           hasChanges = true;
         }
       }
     };
 
-    // Helper to check for file existence by keyword
-    const hasFile = (keywords: string[]) => attachments.some(a =>
-      keywords.some(k => a.fileName.toLowerCase().includes(k.toLowerCase()))
+    // Helper to check for file existence by matching file name with ID
+    const hasFileForId = (id: string) => attachments.some(a =>
+      a.fileName.includes(id)
     );
 
-    // --- 1. Onboarding ---
-    checkItem('onboarding', '1.1', hasFile(['Contact Form']));
-    checkItem('onboarding', '1.2', hasFile(['Application']));
-    checkItem('onboarding', '1.3', hasFile(['Identity', 'ID', 'Driver', 'License', 'Passport']));
-    checkItem('onboarding', '1.4', hasFile(['Residency', 'Lease', 'Utility']));
-    checkItem('onboarding', '1.5', hasFile(['Income', 'Pay Stub', 'Tax']));
-    // For 1.6 Assessment, check file OR if demographics are filled (proxy for intake completion)
-    checkItem('onboarding', '1.6', hasFile(['Assessment']) || (!!client.demographics));
-    checkItem('onboarding', '1.9', hasFile(['Authorization', 'Release']));
-
-    // --- 2. ISP ---
-    if (isp) {
-      checkItem('isp', '2.1', isp.acknowledgmentInitialed);
-      // 2.2 Updated ISP - logic might be complex, skip for now or check if multiple ISPs exist (not supported yet)
-      checkItem('isp', '2.3', !!(isp.shortTermGoals || isp.longTermGoals));
-      checkItem('isp', '2.4', (isp.identifiedBarriers && isp.identifiedBarriers.length > 0));
-      checkItem('isp', '2.5', (isp.planOfAction && isp.planOfAction.length > 0));
-    }
-
-    // --- 3. Case Notes ---
-    checkItem('caseNotes', '3.1', caseNotes.length > 0);
-    checkItem('caseNotes', '3.2', caseNotes.length > 1);
-    checkItem('caseNotes', '3.3', caseNotes.some(n => n.serviceType === 'General Check-in'));
-    checkItem('caseNotes', '3.4', (isp?.supportServices?.length || 0) > 0 || caseNotes.some(n => n.serviceType === 'Supportive Service'));
-
-    // --- 4. Workshops ---
-    checkItem('workshops', '4.1', workshops.length > 0);
-    // 4.2 Job Readiness - maybe check for specific workshop name?
-    // 4.3 Aptitude Test - maybe file?
-    checkItem('workshops', '4.4', hasFile(['Certificate']));
+    // Check all items that have an ID starting with a number (e.g. 1.1, 2.1)
+    // The user said: "If the number (1.1, 1.2, 2.1, etc...) matches the file name of the uploaded file, the Uploaded Checkbox should be checked for that item."
+    newChecklist.forEach(item => {
+      if (/^\d+\.\d+/.test(item.id)) {
+        checkItem(item.id, hasFileForId(item.id));
+      }
+    });
 
     if (hasChanges) {
       setAuditChecklistData(newChecklist);
     }
-  }, [client, isp, attachments, caseNotes, workshops, auditChecklistData]);
+  }, [client, attachments, auditChecklistData]);
   // ---------------------------------------------
 
   // Helper arrays for rendering the training display list
@@ -561,43 +569,28 @@ const ClientDashboardPage: React.FC = () => {
                     )
                   }>
                     <div className="space-y-6">
-                      {/* Render each section */}
-                      {(Object.keys(auditChecklistData) as Array<keyof AuditChecklist>).map(sectionKey => {
-                        const items = auditChecklistData[sectionKey];
-                        if (items.length === 0) return null;
-
-                        return (
-                          <fieldset key={sectionKey} className="border rounded-md">
-                            <legend className="text-md font-medium text-gray-700 px-2 py-1 bg-[#E6E6E6] ml-4 -mt-3 w-auto">
-                              {/* Capitalize section name */}
-                              {sectionKey === 'isp' ? 'ISP' : sectionKey === 'caseNotes' ? 'Case Notes' : sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)}
-                            </legend>
-                            <div className="p-4 overflow-x-auto">
-                              <table className="min-w-full divide-y divide-gray-200 bg-white">
-                                <thead>
-                                  <tr>
-                                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Item</th>
-                                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Present</th>
-                                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Complete</th>
-                                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Uploaded</th>
-                                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items.map(item => (
-                                    <AuditChecklistRow
-                                      key={item.id}
-                                      item={item}
-                                      isEditing={isEditingAuditChecklist}
-                                      onChange={(itemId, field, value) => handleAuditChecklistChange(sectionKey, itemId, field, value)}
-                                    />
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </fieldset>
-                        );
-                      })}
+                      <div className="p-4 overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 bg-white">
+                          <thead>
+                            <tr>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Item</th>
+                              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Complete</th>
+                              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Uploaded</th>
+                              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {auditChecklistData.map(item => (
+                              <AuditChecklistRow
+                                key={item.id}
+                                item={item}
+                                isEditing={isEditingAuditChecklist}
+                                onChange={(itemId, field, value) => handleAuditChecklistChange(itemId, field, value)}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </Card>
                 )}

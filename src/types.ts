@@ -19,13 +19,7 @@ export interface AuditChecklistItem {
   notes: string;
 }
 
-export interface AuditChecklist {
-  onboarding: AuditChecklistItem[];
-  isp: AuditChecklistItem[];
-  caseNotes: AuditChecklistItem[];
-  workshops: AuditChecklistItem[];
-  misc: AuditChecklistItem[];
-}
+export type AuditChecklist = AuditChecklistItem[];
 // ---------------------------------
 
 // Demographics Interface

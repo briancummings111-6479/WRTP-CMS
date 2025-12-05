@@ -41,37 +41,17 @@ const CSV_HEADERS = [
 ];
 
 // --- NEW Initial data for Audit Checklist ---
-const initialAuditChecklist: AuditChecklist = {
-    onboarding: [
-        { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    isp: [
-        { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    caseNotes: [
-        { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    workshops: [
-        { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    misc: []
-};
+const initialAuditChecklist: AuditChecklist = [
+    { id: "1.1", label: "1.1 WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.2", label: "1.2 Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.3", label: "1.3 Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.5", label: "1.5 Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.6", label: "1.6 WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.9", label: "1.9 Authorization of Release", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.1", label: "2.1 Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.2", label: "2.2 Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "referrals", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" },
+];
 
 const DataImportPage: React.FC = () => {
     const { user } = useAuth();
