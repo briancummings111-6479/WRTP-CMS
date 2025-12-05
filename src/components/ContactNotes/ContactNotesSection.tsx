@@ -30,6 +30,17 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
     // Staff Data
     const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
 
+    // Helper to get initials
+    const getInitials = (name: string) => {
+        if (!name) return '';
+        return name
+            .split(' ')
+            .map(part => part[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 3);
+    };
+
     // Initialize defaults
     useEffect(() => {
         const today = new Date();
@@ -64,7 +75,7 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
             // Filter for Contact Notes only
             const contactNotes = allNotes.filter(n => n.noteType === 'Contact Note');
             // Sort by date ascending (oldest first) as per requirement image
-            setNotes(contactNotes.sort((a, b) => b.noteDate - a.noteDate));
+            setNotes(contactNotes.sort((a, b) => a.noteDate - b.noteDate));
         } catch (error) {
             console.error("Error fetching contact notes:", error);
         } finally {
@@ -183,13 +194,13 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                                 Date
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Notes
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                                 Staff
                             </th>
                             <th scope="col" className="relative px-6 py-3 w-16">
@@ -236,12 +247,12 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
                                             >
                                                 {staffMembers.map(member => (
                                                     <option key={member.uid} value={member.uid}>
-                                                        {member.name}
+                                                        {getInitials(member.name)}
                                                     </option>
                                                 ))}
                                             </select>
                                         ) : (
-                                            note.staffName
+                                            getInitials(note.staffName)
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium align-top">
@@ -304,7 +315,7 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId }) =
                                 >
                                     {staffMembers.map(member => (
                                         <option key={member.uid} value={member.uid}>
-                                            {member.name}
+                                            {getInitials(member.name)}
                                         </option>
                                     ))}
                                 </select>
