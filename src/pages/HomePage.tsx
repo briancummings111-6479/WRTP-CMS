@@ -74,6 +74,7 @@ const HomePage: React.FC = () => {
       setLoading(true);
       try {
         const fetchedClients = await api.getClients();
+        fetchedClients.sort((a, b) => a.profile.lastName.localeCompare(b.profile.lastName));
         setClients(fetchedClients);
       } catch (error) {
         console.error("Failed to fetch clients:", error);
