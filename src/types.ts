@@ -288,7 +288,7 @@ export interface Workshop {
   // --- FIX: Added 'Resume Building' to the type ---
   workshopName: 'Career Explorations' | 'Job Preparedness' | 'Interview Success' | 'Financial Literacy' | 'Entrepreneurship' | 'Resume Building' | 'Other';
   workshopNameOther?: string;
-  status: 'Scheduled' | 'In Progress' | 'Declined' | 'Completed' | 'No Show';
+  status: 'Scheduled' | 'In Progress' | 'Declined' | 'Completed' | 'No Show' | 'On Hold';
   assignedToId: string; // UID of staff
   assignedToName: string;
   associatedTaskId?: string; // ID of the task created for this workshop
