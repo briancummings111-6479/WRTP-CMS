@@ -34,7 +34,7 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
                     <div>
                         <h4 class="font-bold text-gray-800 text-lg">${note.noteType}</h4>
                         <div class="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                            <span>Date: ${new Date(note.noteDate).toLocaleString()}</span>
+                            <span>Date: ${new Date(note.noteDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}</span>
                             <span>By: ${note.staffName}</span>
                         </div>
                     </div>
