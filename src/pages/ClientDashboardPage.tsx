@@ -533,7 +533,7 @@ const ClientDashboardPage: React.FC = () => {
 
                 {activeTab === 'Case Notes' && <CaseNotesSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />}
 
-                {activeTab === 'Contact Notes' && <ContactNotesSection clientId={client.id} />}
+                {activeTab === 'Contact Notes' && <ContactNotesSection clientId={client.id} clientName={`${profile.firstName} ${profile.lastName}`} />}
 
                 {activeTab === 'ISP' && <ISPSection client={client} isp={isp} onIspUpdate={handleIspUpdate} />}
 
