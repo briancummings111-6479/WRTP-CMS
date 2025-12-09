@@ -150,7 +150,7 @@ const ReportsPage: React.FC = () => {
     }, [filteredClients]);
 
     const workshopMatrixData = useMemo(() => {
-        const allWorkshopNames = Array.from(new Set(workshops.map(w =>
+        const allWorkshopNames = Array.from<string>(new Set(workshops.map(w =>
             (w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName) as string
         ))).sort((a, b) => {
             const predefinedOrder = [
@@ -555,6 +555,42 @@ const ReportsPage: React.FC = () => {
             </Card>
 
             <Card
+                title="Encounters Report"
+                className="no-print"
+                titleAction={
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
+                        <input
+                            type="month"
+                            id="encountersMonthFilter"
+                            value={encountersMonthFilter}
+                            onChange={(e) => setEncountersMonthFilter(e.target.value)}
+                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                        />
+                    </div>
+                }
+            >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.totalEncounters}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.caseNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.contactNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.workshopsCount}</p>
+                    </div>
+                </div>
+            </Card>
+
+            <Card
                 title="Workshop Matrix Report"
                 titleAction={
                     <div className="flex items-center space-x-2">
@@ -618,42 +654,6 @@ const ReportsPage: React.FC = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
-            </Card>
-
-            <Card
-                title="Encounters Report"
-                className="no-print"
-                titleAction={
-                    <div className="flex items-center space-x-2">
-                        <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
-                        <input
-                            type="month"
-                            id="encountersMonthFilter"
-                            value={encountersMonthFilter}
-                            onChange={(e) => setEncountersMonthFilter(e.target.value)}
-                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                        />
-                    </div>
-                }
-            >
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.totalEncounters}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.caseNotesCount}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.contactNotesCount}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.workshopsCount}</p>
-                    </div>
                 </div>
             </Card>
 
