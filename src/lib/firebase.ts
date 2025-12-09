@@ -160,6 +160,34 @@ const sanitizeData = (data: any): any => {
   return data;
 };
 
+// --- Helper: Recalculate and Update Client's Last Case Note Date ---
+const updateClientLastCaseNoteDate = async (clientId: string) => {
+  try {
+    // We can't easily rely on complex queries with composite indexes being present in all environments.
+    // Safest approach: Fetch all notes for client (using existing index on clientId), filter & sort in memory.
+    // This reuses the logic we already trust in getCaseNotesByClientId, but we replicate it here to avoid
+    // circular dependency or issues if we haven't defined api yet.
+    const q = query(collection(db, "caseNotes"), where("clientId", "==", clientId));
+    const snapshot = await getDocs(q);
+    const notes = snapshot.docs.map(doc => doc.data() as CaseNote);
+
+    // Sort descending by date
+    notes.sort((a, b) => b.noteDate - a.noteDate);
+
+    // Find first note that is of type 'Case Note' (ignoring Contact Notes etc if any)
+    const latestNote = notes.find(n => n.noteType === 'Case Note');
+    const latestDate = latestNote ? latestNote.noteDate : null;
+
+    const clientRef = doc(db, "clients", clientId);
+    await updateDoc(clientRef, {
+      "metadata.lastCaseNoteDate": latestDate
+    });
+    console.log(`Updated client ${clientId} lastCaseNoteDate to ${latestDate ? new Date(latestDate).toISOString() : 'null'}`);
+  } catch (err) {
+    console.error(`Failed to update lastCaseNoteDate for client ${clientId}:`, err);
+  }
+};
+
 const api = {
   // --- Client Functions ---
   getClients: async (): Promise<Client[]> => {
@@ -290,10 +318,15 @@ const api = {
     // The requirement said "Only include Case Notes, not Contact Notes" for the filter.
     if (noteData.noteType === 'Case Note') {
       const clientRef = doc(db, "clients", noteData.clientId);
+      // Optimistic update for immediate feedback, though the helper will also run
       await updateDoc(clientRef, {
         "metadata.lastCaseNoteDate": noteData.noteDate
       });
     }
+
+    // Recalculate to be sure (handles backdating if the new note is NOT the latest, etc.)
+    await updateClientLastCaseNoteDate(noteData.clientId);
+
 
     return { id: docRef.id, ...noteData } as CaseNote;
   },
@@ -302,11 +335,28 @@ const api = {
     const docRef = doc(db, "caseNotes", note.id);
     const { id, ...data } = note;
     await updateDoc(docRef, sanitizeData(data));
+
+    // Recalculate latest date
+    await updateClientLastCaseNoteDate(note.clientId);
+
     return note;
   },
 
   deleteCaseNote: async (noteId: string): Promise<void> => {
-    await deleteDoc(doc(db, "caseNotes", noteId));
+    // We need the clientId to update the parent client. 
+    // Since we only have noteId, we must fetch the note first to get the clientId.
+    const noteRef = doc(db, "caseNotes", noteId);
+    const noteSnap = await getDoc(noteRef);
+    let clientId = "";
+    if (noteSnap.exists()) {
+      clientId = noteSnap.data().clientId;
+    }
+
+    await deleteDoc(noteRef);
+
+    if (clientId) {
+      await updateClientLastCaseNoteDate(clientId);
+    }
   },
 
   // --- Attachment Functions ---
@@ -456,6 +506,67 @@ const api = {
       ...formData,
       submittedAt: Date.now()
     });
+  },
+
+  // --- Migration / Admin Utils ---
+  syncAllClientsLastCaseNoteDate: async (): Promise<number> => {
+    try {
+      const clientsCol = collection(db, "clients");
+      const clientSnapshot = await getDocs(clientsCol);
+      let updatedCount = 0;
+
+      console.log(`Starting sync for ${clientSnapshot.size} clients...`);
+
+      // Process in chunks to avoid overwhelming the browser/network if there are many
+      const clients = clientSnapshot.docs.map(doc => doc.id);
+
+      for (const clientId of clients) {
+        await updateClientLastCaseNoteDate(clientId);
+        updatedCount++;
+      }
+
+      console.log(`Sync completed. Updated ${updatedCount} clients.`);
+      return updatedCount;
+    } catch (error) {
+      console.error("Migration failed:", error);
+      throw error;
+    }
+  },
+
+  createBackup: async (): Promise<any> => {
+    const backup: any = {
+      timestamp: new Date().toISOString(),
+      details: "Full Firestore Backup",
+      data: {}
+    };
+
+    const collectionsToBackup = [
+      'clients',
+      'tasks',
+      'caseNotes',
+      'workshops',
+      'attachments',
+      'users',
+      'intakeForms',
+      'isps'
+    ];
+
+    try {
+      console.log("Starting Backup...");
+      for (const colName of collectionsToBackup) {
+        const colRef = collection(db, colName);
+        const snapshot = await getDocs(colRef);
+        backup.data[colName] = snapshot.docs.map(doc => ({
+          _id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`Backed up ${colName}: ${snapshot.size} docs`);
+      }
+      return backup;
+    } catch (error) {
+      console.error("Backup failed:", error);
+      throw error;
+    }
   },
 };
 

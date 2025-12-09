@@ -102,6 +102,17 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
         fetchNotes();
     };
 
+    const handleDeleteNote = async (noteId: string) => {
+        try {
+            await api.deleteCaseNote(noteId);
+            // Refresh notes after delete to reflect changes (and update metadata if needed via the effect of fetch)
+            fetchNotes();
+        } catch (error) {
+            console.error("Failed to delete note:", error);
+            alert("Failed to delete note. Please try again.");
+        }
+    };
+
     if (loading) {
         return <div>Loading notes...</div>;
     }
@@ -139,6 +150,7 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
                                         key={note.id}
                                         note={note}
                                         onEdit={handleStartEditing}
+                                        onDelete={handleDeleteNote}
                                         clientName={clientName}
                                     />
                                 ))}
