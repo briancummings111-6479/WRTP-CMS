@@ -75,8 +75,8 @@ const ContactNotesSection: React.FC<ContactNotesSectionProps> = ({ clientId, cli
             const allNotes = await api.getCaseNotesByClientId(clientId);
             // Filter for Contact Notes only
             const contactNotes = allNotes.filter(n => n.noteType === 'Contact Note');
-            // Sort by date ascending (oldest first) as per requirement image
-            setNotes(contactNotes.sort((a, b) => b.noteDate - a.noteDate));
+            // Sort by date descending (newest first)
+            setNotes(contactNotes.sort((a, b) => new Date(b.noteDate).getTime() - new Date(a.noteDate).getTime()));
         } catch (error) {
             console.error("Error fetching contact notes:", error);
         } finally {
