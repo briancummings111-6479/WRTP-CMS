@@ -304,6 +304,15 @@ const api = {
   },
 
   // --- Case Note Functions ---
+  getAllCaseNotes: async (): Promise<CaseNote[]> => {
+    const caseNotesCol = collection(db, "caseNotes");
+    const snapshot = await getDocs(caseNotesCol);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as CaseNote[];
+  },
+
   getCaseNotesByClientId: async (clientId: string): Promise<CaseNote[]> => {
     const q = query(collection(db, "caseNotes"), where("clientId", "==", clientId));
     const snapshot = await getDocs(q);

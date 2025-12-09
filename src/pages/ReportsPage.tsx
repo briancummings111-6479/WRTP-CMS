@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/firebase';
-import { Client, Workshop } from '../types';
+import { Client, Workshop, CaseNote } from '../types';
 import Card from '../components/Card';
 import { Printer } from 'lucide-react';
 
@@ -12,6 +12,7 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
         Completed: 'bg-green-100 text-green-800',
         Declined: 'bg-yellow-100 text-yellow-800',
         'No Show': 'bg-red-100 text-red-800',
+        'On Hold': 'bg-gray-100 text-gray-800',
     };
     return (
         <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`}>
@@ -23,23 +24,27 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
 const ReportsPage: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [workshops, setWorkshops] = useState<Workshop[]>([]);
+    const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
     const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [workshopFilter, setWorkshopFilter] = useState('All');
     const [selectedCaseManager, setSelectedCaseManager] = useState('All');
     const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
+    const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>(new Date().toISOString().slice(0, 7));
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [clientsData, workshopsData, usersData] = await Promise.all([
+                const [clientsData, workshopsData, usersData, caseNotesData] = await Promise.all([
                     api.getClients(),
                     api.getAllWorkshops(),
-                    api.getStaffUsers()
+                    api.getStaffUsers(),
+                    api.getAllCaseNotes()
                 ]);
                 setClients(clientsData);
                 setWorkshops(workshopsData);
+                setCaseNotes(caseNotesData);
 
                 // Filter users to only those who are likely case managers (admin or viewer, or just all staff)
                 const staffUsers = usersData
@@ -61,6 +66,38 @@ const ReportsPage: React.FC = () => {
         if (selectedCaseManager === 'All') return clients;
         return clients.filter(c => c.metadata.assignedAdminId === selectedCaseManager);
     }, [clients, selectedCaseManager]);
+
+    const encountersReportData = useMemo(() => {
+        const filteredClientIds = new Set(filteredClients.map(c => c.id));
+
+        const selectedYear = encountersMonthFilter ? parseInt(encountersMonthFilter.split('-')[0]) : null;
+        const selectedMonth = encountersMonthFilter ? parseInt(encountersMonthFilter.split('-')[1]) - 1 : null;
+
+        const filterByMonth = (timestamp: number) => {
+            if (!encountersMonthFilter) return true;
+            const d = new Date(timestamp);
+            return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
+        };
+
+        const relevantCaseNotes = caseNotes.filter(n =>
+            filteredClientIds.has(n.clientId) && filterByMonth(n.noteDate)
+        );
+
+        const relevantWorkshops = workshops.filter(w =>
+            filteredClientIds.has(w.clientId) && filterByMonth(w.workshopDate)
+        );
+
+        const caseNotesCount = relevantCaseNotes.filter(n => n.noteType === 'Case Note').length;
+        const contactNotesCount = relevantCaseNotes.filter(n => n.noteType === 'Contact Note').length;
+        const workshopsCount = relevantWorkshops.filter(w => w.status === 'Completed' || w.status === 'In Progress').length;
+
+        return {
+            totalEncounters: caseNotesCount + contactNotesCount + workshopsCount,
+            caseNotesCount,
+            contactNotesCount,
+            workshopsCount
+        };
+    }, [filteredClients, caseNotes, workshops, encountersMonthFilter]);
 
     const reportData = useMemo(() => {
         const totalIndividuals = filteredClients.length;
@@ -114,7 +151,7 @@ const ReportsPage: React.FC = () => {
 
     const workshopMatrixData = useMemo(() => {
         const allWorkshopNames = Array.from(new Set(workshops.map(w =>
-            w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName
+            (w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName) as string
         ))).sort((a, b) => {
             const predefinedOrder = [
                 'Career Explorations',
@@ -342,6 +379,7 @@ const ReportsPage: React.FC = () => {
                 Completed: 'bg-green-100 text-green-800',
                 Declined: 'bg-yellow-100 text-yellow-800',
                 'No Show': 'bg-red-100 text-red-800',
+                'On Hold': 'bg-gray-100 text-gray-800',
             };
             const classes = `px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`;
             return `<span class="${classes}">${status}</span>`;
@@ -580,6 +618,42 @@ const ReportsPage: React.FC = () => {
                             )}
                         </tbody>
                     </table>
+                </div>
+            </Card>
+
+            <Card
+                title="Encounters Report"
+                className="no-print"
+                titleAction={
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
+                        <input
+                            type="month"
+                            id="encountersMonthFilter"
+                            value={encountersMonthFilter}
+                            onChange={(e) => setEncountersMonthFilter(e.target.value)}
+                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                        />
+                    </div>
+                }
+            >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.totalEncounters}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.caseNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.contactNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.workshopsCount}</p>
+                    </div>
                 </div>
             </Card>
 
