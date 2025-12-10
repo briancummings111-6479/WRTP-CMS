@@ -13,6 +13,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import SignUpPage from './pages/SignUpPage';
 import PendingApprovalPage from './pages/PendingApprovalPage';
 import UsersPage from './pages/UsersPage';
+import ToDoPage from './pages/ToDoPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -78,6 +79,11 @@ function App() {
           <Route path="/reports" element={
             <ProtectedRoute>
               <Layout><ReportsPage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/todo" element={
+            <ProtectedRoute>
+              <Layout><ToDoPage /></Layout>
             </ProtectedRoute>
           } />
 

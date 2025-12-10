@@ -282,7 +282,7 @@ const api = {
     const q = query(collection(db, "tasks"), where("assignedToId", "==", userId));
     const snapshot = await getDocs(q);
     const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-    return tasks.filter(t => t.status !== 'Completed');
+    return tasks;
   },
 
   upsertTask: async (task: Partial<Task> & { clientId: string; title: string }): Promise<Task> => {

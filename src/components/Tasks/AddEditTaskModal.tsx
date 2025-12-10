@@ -20,6 +20,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
   const [linkTo, setLinkTo] = useState(''); // Added state for link
   const [dueDate, setDueDate] = useState('');
   const [urgency, setUrgency] = useState<Task['urgency']>('Green');
+  const [serviceType, setServiceType] = useState<Task['serviceType']>('General Check-in');
   const [status, setStatus] = useState<Task['status']>('Open');
   const [assignedToId, setAssignedToId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -31,6 +32,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
         setLinkTo(taskToEdit.linkTo || ''); // Set link on edit
         setDueDate(new Date(taskToEdit.dueDate).toISOString().split('T')[0]);
         setUrgency(taskToEdit.urgency);
+        setServiceType(taskToEdit.serviceType || 'General Check-in');
         setStatus(taskToEdit.status);
         setAssignedToId(taskToEdit.assignedToId);
       } else {
@@ -39,6 +41,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
         setLinkTo(''); // Reset link
         setDueDate('');
         setUrgency('Green');
+        setServiceType('General Check-in');
         setStatus('Open');
         setAssignedToId(user?.uid || (admins.length > 0 ? admins[0].id : ''));
       }
@@ -59,6 +62,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
       title: title,
       dueDate: new Date(dueDate).getTime(),
       urgency: urgency,
+      serviceType: serviceType,
       assignedToId: assignedToId,
       assignedToName: selectedAdmin?.name || 'Unknown',
       createdBy: user.name,
@@ -116,6 +120,17 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
                   <option value="Green">Green</option>
                   <option value="Yellow">Yellow</option>
                   <option value="Red">Red</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="serviceType" className="block text-sm font-medium text-gray-700">Service Type</label>
+                <select id="serviceType" value={serviceType} onChange={(e) => setServiceType(e.target.value as Task['serviceType'])} className="form-input mt-1">
+                  <option>Job Search</option>
+                  <option>Supportive Service</option>
+                  <option>Training</option>
+                  <option>Intake Meeting</option>
+                  <option>ISP Review</option>
+                  <option>General Check-in</option>
                 </select>
               </div>
             </div>

@@ -196,6 +196,7 @@ export interface Task {
   status: 'Open' | 'In Progress' | 'Waiting' | 'Completed';
   linkTo: string | null;
   urgency: 'Green' | 'Yellow' | 'Red';
+  serviceType?: 'Job Search' | 'Supportive Service' | 'Training' | 'Intake Meeting' | 'ISP Review' | 'General Check-in';
 }
 
 // Case Note Model
