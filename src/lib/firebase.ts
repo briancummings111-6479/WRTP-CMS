@@ -455,6 +455,25 @@ const api = {
     console.log("Invite user not implemented client-side", { email, role, title, name });
   },
 
+  createUser: async (userData: { name: string; email: string; role: AppUser['role']; title: string }): Promise<void> => {
+    // Check if email already exists to prevent duplicates
+    const normalizedEmail = userData.email.toLowerCase();
+    const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      throw new Error("User with this email already exists.");
+    }
+
+    // Create a new document. AuthContext will migrate this to the correct UID upon first login.
+    await addDoc(collection(db, "users"), {
+      name: userData.name,
+      email: normalizedEmail,
+      role: userData.role,
+      title: userData.title,
+      createdAt: Date.now()
+    });
+  },
+
   deleteUser: async (uid: string): Promise<void> => {
     await deleteDoc(doc(db, "users", uid));
   },

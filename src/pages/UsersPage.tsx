@@ -16,6 +16,9 @@ const UsersPage: React.FC = () => {
     const [mergeTargetId, setMergeTargetId] = useState('');
     const [mergeStatus, setMergeStatus] = useState<string | null>(null);
 
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addForm, setAddForm] = useState({ name: '', email: '', role: 'viewer' as AppUser['role'], title: '' });
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -109,6 +112,24 @@ const UsersPage: React.FC = () => {
         }
     };
 
+    const handleAddUser = async () => {
+        if (!addForm.name || !addForm.email) {
+            alert("Name and Email are required.");
+            return;
+        }
+
+        try {
+            await api.createUser(addForm);
+            alert("User created successfully!");
+            setShowAddModal(false);
+            setAddForm({ name: '', email: '', role: 'viewer', title: '' });
+            fetchUsers();
+        } catch (error: any) {
+            console.error("Failed to create user:", error);
+            alert("Failed to create user: " + (error.message || error));
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setEditForm(prev => ({ ...prev, [name]: value }));
@@ -131,69 +152,149 @@ const UsersPage: React.FC = () => {
                     <UserPlus className="h-5 w-5 mr-2" />
                     Merge Users
                 </button>
+                <button
+                    onClick={() => setShowAddModal(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center ml-4"
+                >
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    Add User
+                </button>
             </div>
 
-            {/* Merge Modal */}
-            {showMergeModal && (
+            {/* Add User Modal */}
+            {showAddModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
                     <div className="bg-white p-5 rounded-lg shadow-xl w-96">
-                        <h2 className="text-xl font-bold mb-4">Merge User Accounts</h2>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Move all data from one user to another. Useful for fixing duplicate accounts.
-                        </p>
+                        <h2 className="text-xl font-bold mb-4">Add New User</h2>
 
                         <div className="mb-4">
-                            <label className="block text-gray-700 text-sm font-bold mb-2">From (Source)</label>
-                            <select
+                            <label className="block text-gray-700 text-sm font-bold mb-2">Name</label>
+                            <input
+                                type="text"
                                 className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                value={mergeSourceId}
-                                onChange={(e) => setMergeSourceId(e.target.value)}
-                            >
-                                <option value="">Select Source User</option>
-                                {users.map(u => (
-                                    <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
-                                ))}
-                            </select>
+                                value={addForm.name}
+                                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                                placeholder="Full Name"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                            <input
+                                type="email"
+                                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                value={addForm.email}
+                                onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                                placeholder="email@example.com"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-gray-700 text-sm font-bold mb-2">Title</label>
+                            <input
+                                type="text"
+                                className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                value={addForm.title}
+                                onChange={(e) => setAddForm({ ...addForm, title: e.target.value })}
+                                placeholder="e.g. Case Manager"
+                            />
                         </div>
 
                         <div className="mb-6">
-                            <label className="block text-gray-700 text-sm font-bold mb-2">To (Target)</label>
+                            <label className="block text-gray-700 text-sm font-bold mb-2">Role</label>
                             <select
                                 className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                value={mergeTargetId}
-                                onChange={(e) => setMergeTargetId(e.target.value)}
+                                value={addForm.role}
+                                onChange={(e) => setAddForm({ ...addForm, role: e.target.value as AppUser['role'] })}
                             >
-                                <option value="">Select Target User</option>
-                                {users.map(u => (
-                                    <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
-                                ))}
+                                <option value="viewer">Viewer</option>
+                                <option value="admin">Admin</option>
+                                <option value="pending">Pending</option>
                             </select>
                         </div>
 
-                        {mergeStatus && (
-                            <div className="mb-4 text-sm font-semibold text-blue-600">
-                                {mergeStatus}
-                            </div>
-                        )}
-
                         <div className="flex justify-end space-x-2">
                             <button
-                                onClick={() => setShowMergeModal(false)}
+                                onClick={() => setShowAddModal(false)}
                                 className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
                             >
                                 Cancel
                             </button>
                             <button
-                                onClick={handleMergeUsers}
-                                disabled={!!mergeStatus && mergeStatus === "Merging..."}
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                                onClick={handleAddUser}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
                             >
-                                Merge Data
+                                Add User
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
+
+            {/* Merge Modal */}
+            {
+                showMergeModal && (
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                        <div className="bg-white p-5 rounded-lg shadow-xl w-96">
+                            <h2 className="text-xl font-bold mb-4">Merge User Accounts</h2>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Move all data from one user to another. Useful for fixing duplicate accounts.
+                            </p>
+
+                            <div className="mb-4">
+                                <label className="block text-gray-700 text-sm font-bold mb-2">From (Source)</label>
+                                <select
+                                    className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    value={mergeSourceId}
+                                    onChange={(e) => setMergeSourceId(e.target.value)}
+                                >
+                                    <option value="">Select Source User</option>
+                                    {users.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-gray-700 text-sm font-bold mb-2">To (Target)</label>
+                                <select
+                                    className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    value={mergeTargetId}
+                                    onChange={(e) => setMergeTargetId(e.target.value)}
+                                >
+                                    <option value="">Select Target User</option>
+                                    {users.map(u => (
+                                        <option key={u.uid} value={u.uid}>{u.name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {mergeStatus && (
+                                <div className="mb-4 text-sm font-semibold text-blue-600">
+                                    {mergeStatus}
+                                </div>
+                            )}
+
+                            <div className="flex justify-end space-x-2">
+                                <button
+                                    onClick={() => setShowMergeModal(false)}
+                                    className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleMergeUsers}
+                                    disabled={!!mergeStatus && mergeStatus === "Merging..."}
+                                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+                                >
+                                    Merge Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -280,7 +381,7 @@ const UsersPage: React.FC = () => {
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div >
     );
 };
 
