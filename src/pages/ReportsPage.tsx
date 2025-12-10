@@ -68,8 +68,6 @@ const ReportsPage: React.FC = () => {
     }, [clients, selectedCaseManager]);
 
     const encountersReportData = useMemo(() => {
-        const filteredClientIds = new Set(filteredClients.map(c => c.id));
-
         const selectedYear = encountersMonthFilter ? parseInt(encountersMonthFilter.split('-')[0]) : null;
         const selectedMonth = encountersMonthFilter ? parseInt(encountersMonthFilter.split('-')[1]) - 1 : null;
 
@@ -79,12 +77,17 @@ const ReportsPage: React.FC = () => {
             return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
         };
 
+        const filterByStaff = (id: string) => {
+            if (selectedCaseManager === 'All') return true;
+            return id === selectedCaseManager;
+        }
+
         const relevantCaseNotes = caseNotes.filter(n =>
-            filteredClientIds.has(n.clientId) && filterByMonth(n.noteDate)
+            filterByStaff(n.staffId) && filterByMonth(n.noteDate)
         );
 
         const relevantWorkshops = workshops.filter(w =>
-            filteredClientIds.has(w.clientId) && filterByMonth(w.workshopDate)
+            filterByStaff(w.assignedToId) && filterByMonth(w.workshopDate)
         );
 
         const caseNotesCount = relevantCaseNotes.filter(n => n.noteType === 'Case Note').length;
@@ -97,7 +100,7 @@ const ReportsPage: React.FC = () => {
             contactNotesCount,
             workshopsCount
         };
-    }, [filteredClients, caseNotes, workshops, encountersMonthFilter]);
+    }, [caseNotes, workshops, encountersMonthFilter, selectedCaseManager]);
 
     const reportData = useMemo(() => {
         const totalIndividuals = filteredClients.length;
