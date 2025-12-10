@@ -258,7 +258,7 @@ const ReportsPage: React.FC = () => {
 
     const generateClientReportHTML = () => {
         const caseManagerName = selectedCaseManager === 'All'
-            ? 'All Case Managers'
+            ? 'All Staff'
             : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
 
         return `
@@ -276,7 +276,7 @@ const ReportsPage: React.FC = () => {
                     <h1 class="text-3xl font-bold text-gray-900">Client Population Report</h1>
                     <div class="mt-2 flex justify-between text-gray-600">
                         <p>Generated on: ${new Date().toLocaleDateString()}</p>
-                        <p>Case Manager: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
+                        <p>WRTP Staff: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
                     </div>
                 </header>
                 
@@ -422,7 +422,7 @@ const ReportsPage: React.FC = () => {
             : '';
 
         const caseManagerName = selectedCaseManager === 'All'
-            ? 'All Case Managers'
+            ? 'All Staff'
             : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
 
         return `
@@ -439,7 +439,7 @@ const ReportsPage: React.FC = () => {
                 <header class="mb-6">
                     <h1 class="text-2xl font-bold">Workshop Attendance Report</h1>
                     <p class="text-gray-600">Generated on: ${new Date().toLocaleDateString()}</p>
-                    <p class="text-gray-600">Case Manager: ${caseManagerName}</p>
+                    <p class="text-gray-600">WRTP Staff: ${caseManagerName}</p>
                     ${workshopFilter !== 'All' ? `<p class="text-gray-600">Filter: ${workshopFilter}</p>` : ''}
                 </header>
                 <main class="space-y-8">
@@ -479,14 +479,14 @@ const ReportsPage: React.FC = () => {
             <div className="flex justify-between items-center no-print">
                 <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
                 <div className="flex items-center space-x-2">
-                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">Case Manager:</label>
+                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">WRTP Staff:</label>
                     <select
                         id="caseManagerFilter"
                         value={selectedCaseManager}
                         onChange={(e) => setSelectedCaseManager(e.target.value)}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
                     >
-                        <option value="All">All Case Managers</option>
+                        <option value="All">All Staff</option>
                         {admins.map(admin => (
                             <option key={admin.id} value={admin.id}>{admin.name}</option>
                         ))}
@@ -513,11 +513,11 @@ const ReportsPage: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span className="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
+                            <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span class="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span className="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
+                            <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span class="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
@@ -584,7 +584,7 @@ const ReportsPage: React.FC = () => {
                         <p className="text-3xl font-bold text-gray-800">{encountersReportData.contactNotesCount}</p>
                     </div>
                     <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops</p>
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops Delivered</p>
                         <p className="text-3xl font-bold text-gray-800">{encountersReportData.workshopsCount}</p>
                     </div>
                 </div>
