@@ -92,6 +92,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete }) => {
             <div className="flex justify-between items-end mt-2">
                 <div className="text-xs text-gray-500 space-y-1">
                     <p className="flex items-center"><Calendar className="h-3 w-3 mr-1.5" /> Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                    <p className="flex items-center"><User className="h-3 w-3 mr-1.5" /> Client: {task.clientName}</p>
                     <p className="flex items-center"><User className="h-3 w-3 mr-1.5" /> For: {task.assignedToName}</p>
                 </div>
                 <div className="flex items-center space-x-2">
