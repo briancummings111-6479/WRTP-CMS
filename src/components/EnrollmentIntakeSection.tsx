@@ -78,13 +78,60 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
             <Card
                 title="Enrollment Intake Form"
                 titleAction={
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
-                    >
-                        {loading ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <label className={`inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded shadow-sm text-gray-700 bg-white hover:bg-gray-50 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            {loading && !success && !error ? 'Processing...' : 'Auto-Fill from PDF'}
+                            <input
+                                type="file"
+                                accept="application/pdf,image/*"
+                                className="hidden"
+                                disabled={loading}
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        const file = e.target.files[0];
+                                        setLoading(true);
+                                        setError(null);
+                                        setSuccess(null);
+                                        try {
+                                            const extractedData = await api.extractFormData(file, 'Intake');
+                                            // Merge extracted data
+                                            setFormData(prev => {
+                                                if (!prev) return extractedData;
+                                                return {
+                                                    ...prev,
+                                                    ...extractedData,
+                                                    // Deep merge for nested objects if needed, but top-level spread + manual merge below is safer
+                                                    publicAssistance: { ...prev.publicAssistance, ...(extractedData.publicAssistance || {}) },
+                                                    barriersToEmployment: { ...prev.barriersToEmployment, ...(extractedData.barriersToEmployment || {}) },
+                                                    supportServices: { ...prev.supportServices, ...(extractedData.supportServices || {}) },
+                                                    incomeCertification: {
+                                                        ...prev.incomeCertification,
+                                                        ...(extractedData.incomeCertification || {}),
+                                                        race: { ...prev.incomeCertification.race, ...(extractedData.incomeCertification?.race || {}) }
+                                                    }
+                                                };
+                                            });
+                                            setSuccess(`Form populated from ${file.name}. Please review changes.`);
+                                        } catch (err: any) {
+                                            console.error("Auto-fill failed:", err);
+                                            setError("Failed to auto-fill form: " + (err.message || "Unknown error"));
+                                        } finally {
+                                            setLoading(false);
+                                            // Clear input value to allow re-upload ensuring onChange fires
+                                            e.target.value = '';
+                                        }
+                                    }
+                                }}
+                            />
+                        </label>
+                        <button
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
+                        >
+                            {loading ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
+                        </button>
+                    </div>
                 }
             >
                 <div className="space-y-8">

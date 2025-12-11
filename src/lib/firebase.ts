@@ -25,6 +25,7 @@ import {
   User
 } from "firebase/auth";
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { getFunctions, httpsCallable, connectFunctionsEmulator, Functions } from "firebase/functions";
 import { getAnalytics, Analytics } from "firebase/analytics";
 
 // Import our custom types
@@ -68,7 +69,13 @@ if (!getApps().length) {
 const db: Firestore = getFirestore(app);
 const auth: Auth = getAuth(app);
 const storage: FirebaseStorage = getStorage(app);
+const functions: Functions = getFunctions(app);
 const analytics: Analytics = getAnalytics(app);
+
+// Connect to emulators if working locally
+if (location.hostname === "localhost") {
+  connectFunctionsEmulator(functions, "localhost", 5001);
+}
 
 // --- Default Values ---
 const defaultDemographics: Demographics = {
@@ -595,6 +602,31 @@ const api = {
       console.error("Backup failed:", error);
       throw error;
     }
+  },
+
+  // --- OCR Functions ---
+  extractFormData: async (file: File, formType: 'Intake' | 'ISP'): Promise<any> => {
+    // Convert file to Base64
+    const reader = new FileReader();
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          const base64String = (reader.result as string).split(',')[1];
+          const extractFn = httpsCallable(functions, 'extractFormDataFromPdf');
+          const result = await extractFn({
+            fileBase64: base64String,
+            mimeType: file.type,
+            formType
+          });
+          resolve(result.data);
+        } catch (error) {
+          console.error("OCR Error:", error);
+          reject(error);
+        }
+      };
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
   },
 };
 
