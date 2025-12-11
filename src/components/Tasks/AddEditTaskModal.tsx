@@ -61,6 +61,7 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
       clientName: clientName,
       title: title,
       dueDate: new Date(dueDate).getTime(),
+      dateCreated: taskToEdit?.dateCreated || Date.now(),
       urgency: urgency,
       serviceType: serviceType,
       assignedToId: assignedToId,

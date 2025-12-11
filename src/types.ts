@@ -197,6 +197,7 @@ export interface Task {
   linkTo: string | null;
   urgency: 'Green' | 'Yellow' | 'Red';
   serviceType?: 'Job Search' | 'Supportive Service' | 'Training' | 'Intake Meeting' | 'ISP Review' | 'General Check-in';
+  dateCreated?: number; // Timestamp
 }
 
 // Case Note Model

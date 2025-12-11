@@ -19,6 +19,7 @@ const ToDoPage: React.FC = () => {
     const [serviceTypeFilter, setServiceTypeFilter] = useState('All Types');
     const [statusFilter, setStatusFilter] = useState('All Open'); // Default to All Open (Active)
     const [urgencyFilter, setUrgencyFilter] = useState('All Urgencies');
+    const [sortBy, setSortBy] = useState<'dueDate' | 'created'>('dueDate');
 
     // Modal State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -33,8 +34,6 @@ const ToDoPage: React.FC = () => {
                         api.getTasksByUserId(user.uid),
                         api.getStaffUsers()
                     ]);
-                    // Sort by due date
-                    tasksData.sort((a, b) => a.dueDate - b.dueDate);
                     setTasks(tasksData);
                     setStaff(staffData);
                 } catch (error) {
@@ -48,7 +47,7 @@ const ToDoPage: React.FC = () => {
     }, [user]);
 
     const filteredTasks = useMemo(() => {
-        return tasks.filter(task => {
+        let result = tasks.filter(task => {
             const matchesServiceType = serviceTypeFilter === 'All Types' || task.serviceType === serviceTypeFilter;
 
             let matchesStatus = true;
@@ -62,7 +61,23 @@ const ToDoPage: React.FC = () => {
 
             return matchesServiceType && matchesStatus && matchesUrgency;
         });
-    }, [tasks, serviceTypeFilter, statusFilter, urgencyFilter]);
+
+        // Sorting
+        result.sort((a, b) => {
+            if (sortBy === 'created') {
+                // Newest Created First
+                const dateA = a.dateCreated || 0;
+                const dateB = b.dateCreated || 0;
+                // If created date is missing, treat as oldest (0)
+                return dateB - dateA;
+            } else {
+                // Due Date: Earliest Date at Top
+                return a.dueDate - b.dueDate;
+            }
+        });
+
+        return result;
+    }, [tasks, serviceTypeFilter, statusFilter, urgencyFilter, sortBy]);
 
     const handleEditTask = (task: Task) => {
         setTaskToEdit(task);
@@ -105,7 +120,7 @@ const ToDoPage: React.FC = () => {
 
                     {/* Filters */}
                     <Card>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
                                 <select
@@ -148,6 +163,17 @@ const ToDoPage: React.FC = () => {
                                     <option value="Green">Green (Normal)</option>
                                     <option value="Yellow">Yellow (Medium)</option>
                                     <option value="Red">Red (High)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                                <select
+                                    value={sortBy}
+                                    onChange={e => setSortBy(e.target.value as 'dueDate' | 'created')}
+                                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
+                                >
+                                    <option value="dueDate">Due Date (Earliest First)</option>
+                                    <option value="created">Recently Created</option>
                                 </select>
                             </div>
                         </div>
