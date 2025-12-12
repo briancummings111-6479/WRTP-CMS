@@ -16,6 +16,59 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
+    // Auto-OCR Handler
+    const handleFileUploaded = async (file: File) => {
+        if (file.name.startsWith("1.2")) {
+            setLoading(true);
+            setError(null);
+            setSuccess(null);
+            try {
+                const extractedData = await api.extractFormData(file, 'Intake');
+
+                setFormData(prev => {
+                    // Calculate new state
+                    const newData = {
+                        ...(prev || defaultDemographics),
+                        ...extractedData,
+                        // Deep merge for nested objects
+                        publicAssistance: { ...(prev?.publicAssistance || defaultDemographics.publicAssistance), ...(extractedData.publicAssistance || {}) },
+                        barriersToEmployment: { ...(prev?.barriersToEmployment || defaultDemographics.barriersToEmployment), ...(extractedData.barriersToEmployment || {}) },
+                        supportServices: { ...(prev?.supportServices || defaultDemographics.supportServices), ...(extractedData.supportServices || {}) },
+                        incomeCertification: {
+                            ...(prev?.incomeCertification || defaultDemographics.incomeCertification),
+                            ...(extractedData.incomeCertification || {}),
+                            race: { ...(prev?.incomeCertification?.race || defaultDemographics.incomeCertification.race), ...(extractedData.incomeCertification?.race || {}) }
+                        }
+                    };
+
+                    // Auto-Save Immediately
+                    // We must use the calculated newData variable here because setState is async
+                    const updatedClient = {
+                        ...client,
+                        demographics: newData
+                    };
+
+                    // Fire and forget or await? Await is safer to show success.
+                    api.updateClient(updatedClient).then(() => {
+                        onUpdate(updatedClient);
+                        setSuccess(`Auto-filled and saved from ${file.name}`);
+                    }).catch(err => {
+                        console.error("Auto-save failed:", err);
+                        setError("Auto-fill worked but save failed: " + err.message);
+                    });
+
+                    return newData;
+                });
+
+            } catch (err: any) {
+                console.error("Auto-fill failed:", err);
+                setError("Failed to auto-fill form: " + (err.message || "Unknown error"));
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
     useEffect(() => {
         setFormData(client.demographics || defaultDemographics);
     }, [client.demographics]);
@@ -73,7 +126,8 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
     return (
         <div className="space-y-6">
             {/* Attachments Section */}
-            <AttachmentsSection clientId={client.id} category="Enrollment" />
+            {/* Attachments Section */}
+            <AttachmentsSection clientId={client.id} category="Enrollment" onFileUploaded={handleFileUploaded} />
 
             <Card
                 title="Enrollment Intake Form"
@@ -208,7 +262,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                         <div className="space-y-2">
                             <label className="block font-medium text-gray-700">Public Assistance (Check all that apply):</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {Object.entries(formData.publicAssistance).map(([key, value]) => {
+                                {Object.entries(formData.publicAssistance || {}).map(([key, value]) => {
                                     if (key === 'other') return null;
                                     return (
                                         <div key={key} className="flex items-center space-x-2">
@@ -239,7 +293,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                         <div className="space-y-2">
                             <label className="block font-medium text-gray-700">Barriers to Employment (Check all that apply):</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {Object.entries(formData.barriersToEmployment).map(([key, value]) => {
+                                {Object.entries(formData.barriersToEmployment || {}).map(([key, value]) => {
                                     if (key === 'other') return null;
                                     return (
                                         <div key={key} className="flex items-center space-x-2">
@@ -348,7 +402,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                         <div className="space-y-2">
                             <label className="block font-medium text-gray-700">What types of support would help you most? (Check all that apply):</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {Object.entries(formData.supportServices).map(([key, value]) => {
+                                {Object.entries(formData.supportServices || {}).map(([key, value]) => {
                                     if (key === 'other') return null;
                                     return (
                                         <div key={key} className="flex items-center space-x-2">
@@ -455,14 +509,14 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                         <div>
                             <label className="block font-medium text-gray-700 mb-2">Race & Ethnicity</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {Object.entries(formData.incomeCertification.race).map(([key, value]) => (
+                                {Object.entries(formData.incomeCertification?.race || {}).map(([key, value]) => (
                                     <div key={key} className="flex items-center space-x-2">
                                         <input
                                             type="checkbox"
                                             id={`race-${key}`}
                                             checked={value as boolean}
                                             onChange={(e) => {
-                                                const newRace = { ...formData.incomeCertification.race, [key]: e.target.checked };
+                                                const newRace = { ...(formData.incomeCertification?.race || {}), [key]: e.target.checked };
                                                 handleChange('incomeCertification', 'race', newRace);
                                             }}
                                             className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"

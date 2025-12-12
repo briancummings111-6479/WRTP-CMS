@@ -10,9 +10,10 @@ interface AttachmentsSectionProps {
     clientId: string;
     showList?: boolean;
     category?: string; // Optional category filter
+    onFileUploaded?: (file: File) => void;
 }
 
-const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showList = true, category }) => {
+const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showList = true, category, onFileUploaded }) => {
     const { user } = useAuth();
     const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -84,6 +85,11 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
 
                 await api.addAttachment(newAttachment);
                 successCount++;
+
+                // Trigger callback if provided
+                if (onFileUploaded) {
+                    onFileUploaded(file);
+                }
             } catch (error: any) {
                 console.error(`Failed to upload ${file.name}:`, error);
                 let errorMessage = `Failed to upload ${file.name}: `;

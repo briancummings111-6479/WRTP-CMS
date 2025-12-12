@@ -153,17 +153,31 @@ const defaultDemographics: Demographics = {
 
 // --- API Object ---
 // --- Helper to sanitize data for Firestore (remove undefined) ---
-const sanitizeData = (data: any): any => {
+const sanitizeData = (data: any, visited = new WeakSet()): any => {
   if (data === null || data === undefined) return null;
-  if (Array.isArray(data)) return data.map(sanitizeData);
-  if (typeof data === 'object' && !(data instanceof Date)) {
+
+  if (typeof data === 'object' && data !== null) {
+    if (data instanceof Date) return data;
+
+    // Cycle detection
+    if (visited.has(data)) {
+      console.warn("Circular reference detected in sanitizeData, skipping.", data);
+      return null;
+    }
+    visited.add(data);
+
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizeData(item, visited));
+    }
+
     return Object.entries(data).reduce((acc, [key, value]) => {
       if (value !== undefined) {
-        acc[key] = sanitizeData(value);
+        acc[key] = sanitizeData(value, visited);
       }
       return acc;
     }, {} as any);
   }
+
   return data;
 };
 

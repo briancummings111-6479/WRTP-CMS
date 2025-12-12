@@ -57,7 +57,65 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         }
     }, [isEditing, isp]);
 
+    const [isProcessing, setIsProcessing] = useState(false);
 
+    // Auto-OCR Handler
+    const handleFileUploaded = async (file: File) => {
+        if (file.name.startsWith("2.1")) {
+            setIsProcessing(true);
+            try {
+                const extractedData = await api.extractFormData(file, 'ISP');
+
+                // 1. Update Local State
+                setFormData(prev => {
+                    const newData = {
+                        ...prev,
+                        ...extractedData,
+                        careerPlanning: { ...prev.careerPlanning, ...(extractedData.careerPlanning || {}) }
+                    };
+
+                    // 2. Auto-Save to Backend
+                    // Ensure we have all necessary fields for a valid ISP object
+                    // If creating new, generate ID. If updating, use existing.
+                    const ispId = isp?.id || crypto.randomUUID();
+
+                    const ispDataToSave = {
+                        ...defaultISPForm,
+                        ...isp,
+                        ...newData,
+                        clientId: clientId,
+                        id: ispId,
+                        // Ensure ISP Date is set
+                        ispDate: newData.ispDate || Date.now()
+                    } as ISP;
+
+                    api.upsertISP(ispDataToSave).then(() => {
+                        // Refresh logic handled by parent via onIspUpdate?
+                        // Actually onIspUpdate expects an ISP object and likely refreshes parent state
+                        onIspUpdate(ispDataToSave);
+                        alert(`ISP auto-filled and saved from ${file.name}`);
+                    }).catch(err => {
+                        console.error("Auto-save failed:", err);
+                        alert("Auto-fill worked but save failed: " + err.message);
+                    });
+
+                    return newData;
+                });
+
+                // If not editing, switch to edit mode to show changes? 
+                // Or just show them in the read-only view if they match?
+                // The read-only view relies on `isp` prop, which comes from parent.
+                // onIspUpdate should update the parent, which flows back down.
+                setIsEditing(true);
+
+            } catch (err: any) {
+                console.error("Failed to auto-fill ISP:", err);
+                alert("Failed to auto-fill: " + err.message);
+            } finally {
+                setIsProcessing(false);
+            }
+        }
+    };
     const handleEdit = () => setIsEditing(true);
     const handleCancel = () => {
         setIsEditing(false);
@@ -269,7 +327,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
     return (
         <div className="space-y-6">
-            <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
+            <AttachmentsSection clientId={clientId} category="ISP" showList={true} onFileUploaded={handleFileUploaded} />
 
             {(isEditing || !isp) ? (
                 <Card title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"} titleAction={
