@@ -137,7 +137,7 @@ const UsersPage: React.FC = () => {
 
     if (loading) return <div className="p-6">Loading users...</div>;
 
-    if (currentUser?.role !== 'admin') {
+    if (currentUser?.title !== 'Administrator') {
         return <div className="p-6 text-red-600">Access Denied. Admin permissions required.</div>;
     }
 

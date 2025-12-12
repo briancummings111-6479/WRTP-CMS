@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const commonNavItems: { to: string; text: string; icon: React.ElementType }[] = [
   { to: '/', text: 'Dashboard', icon: Home },
-  { to: '/todo', text: 'To-Do Tasks', icon: ClipboardList },
+  { to: '/todo', text: 'Task Management', icon: ClipboardList },
   { to: '/reports', text: 'Reports', icon: BarChart2 },
 ];
 
@@ -33,7 +33,7 @@ const NavItem: React.FC<{ to: string, text: string, icon: React.ElementType }> =
 
 const Sidebar = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.title === 'Administrator';
 
   return (
     <div className="w-64 bg-[#6C8480] border-r border-[#5a6e69] flex flex-col no-print">

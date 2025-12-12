@@ -21,6 +21,9 @@ const ToDoPage: React.FC = () => {
     const [urgencyFilter, setUrgencyFilter] = useState('All Urgencies');
     const [sortBy, setSortBy] = useState<'dueDate' | 'created'>('dueDate');
 
+    // Admin Filters
+    const [staffFilter, setStaffFilter] = useState('All Staff');
+
     // Modal State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
@@ -30,8 +33,20 @@ const ToDoPage: React.FC = () => {
             if (user) {
                 setLoading(true);
                 try {
+                    const isAdmin = user.title === 'Administrator';
+
+                    // If Admin, fetch ALL tasks. If not, fetch only assigned tasks.
+                    const tasksPromise = isAdmin ? api.getTasks() : api.getTasksByUserId(user.uid);
+
+                    // Fetch staff list if Admin (for filter & modal) or if needed for Edit Modal (which uses staff list for changing assignee)
+                    // Currently Edit Modal is only available to owner or maybe admin? 
+                    // Let's always fetch staff if we are editing, but for the page filter we definitely need it if Admin.
+                    // The original code passed `staff` to `AddEditTaskModal`.
+                    // We can just always fetch staff since the list is likely small, or conditionally.
+                    // Let's stick to original pattern but ensure we get all tasks for Admin.
+
                     const [tasksData, staffData] = await Promise.all([
-                        api.getTasksByUserId(user.uid),
+                        tasksPromise,
                         api.getStaffUsers()
                     ]);
                     setTasks(tasksData);
@@ -48,6 +63,12 @@ const ToDoPage: React.FC = () => {
 
     const filteredTasks = useMemo(() => {
         let result = tasks.filter(task => {
+            // Admin Filter: Staff Member
+            let matchesStaff = true;
+            if (user?.title === 'Administrator' && staffFilter !== 'All Staff') {
+                matchesStaff = task.assignedToId === staffFilter;
+            }
+
             const matchesServiceType = serviceTypeFilter === 'All Types' || task.serviceType === serviceTypeFilter;
 
             let matchesStatus = true;
@@ -59,7 +80,7 @@ const ToDoPage: React.FC = () => {
 
             const matchesUrgency = urgencyFilter === 'All Urgencies' || task.urgency === urgencyFilter;
 
-            return matchesServiceType && matchesStatus && matchesUrgency;
+            return matchesStaff && matchesServiceType && matchesStatus && matchesUrgency;
         });
 
         // Sorting
@@ -77,7 +98,7 @@ const ToDoPage: React.FC = () => {
         });
 
         return result;
-    }, [tasks, serviceTypeFilter, statusFilter, urgencyFilter, sortBy]);
+    }, [tasks, serviceTypeFilter, statusFilter, urgencyFilter, sortBy, staffFilter, user]);
 
     const handleEditTask = (task: Task) => {
         setTaskToEdit(task);
@@ -112,15 +133,30 @@ const ToDoPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">To-Do Tasks</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
 
             <div className="flex flex-col lg:flex-row gap-6">
-                {/* Left Column: 2/3 */}
-                <div className="lg:w-2/3 space-y-4">
+                {/* Task List Column */}
+                <div className={`${user?.title === 'Administrator' ? 'w-full' : 'lg:w-2/3'} space-y-4`}>
 
                     {/* Filters */}
                     <Card>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className={`p-4 grid grid-cols-1 md:grid-cols-2 gap-4 ${user?.title === 'Administrator' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+                            {user?.title === 'Administrator' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Staff Member</label>
+                                    <select
+                                        value={staffFilter}
+                                        onChange={e => setStaffFilter(e.target.value)}
+                                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
+                                    >
+                                        <option value="All Staff">All Tasks (Admin View)</option>
+                                        {staff.map(s => (
+                                            <option key={s.uid} value={s.uid}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
                                 <select
@@ -181,41 +217,23 @@ const ToDoPage: React.FC = () => {
 
                     {/* Task List */}
                     <Card title="My Tasks">
-                        <div className="p-4 space-y-3">
+                        <div className={`p-4 ${user?.title === 'Administrator' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
                             {loading ? (
-                                <div className="text-center py-4 text-gray-500">Loading tasks...</div>
+                                <div className="text-center py-4 text-gray-500 col-span-full">Loading tasks...</div>
                             ) : filteredTasks.length > 0 ? (
                                 filteredTasks.map(task => (
-                                    <div key={task.id} onClick={() => navigate(`/clients/${task.clientId}`)} className="cursor-pointer group">
-                                        {/* Wrapping TaskItem to add navigation, assuming clicking the row usually navigates. 
-                                            TaskItem itself has stopPropagation on buttons.
-                                            However TaskItem styles specifically handle hover etc. 
-                                            Ideally TaskItem should handle the click or be wrapped. 
-                                            I'll wrap it in a div that handles click, but TaskItem has its own styling.
-                                            Let's just place TaskItem. TaskItem handles Edit/Delete events.
-                                            If I want navigation, I need to pass it or wrap it.
-                                            The rendered TaskItem is a div.
-                                         */}
-                                        <div className="relative">
+                                    <div key={task.id} onClick={() => navigate(`/clients/${task.clientId}`)} className="cursor-pointer group h-full">
+                                        <div className="relative h-full">
                                             <TaskItem
                                                 task={task}
                                                 onEdit={handleEditTask}
                                                 onDelete={handleDeleteTask}
                                             />
-                                            {/* Overlay for click to navigate? Or just rely on user knowing? 
-                                                The Home page had navigation. I should probably add it.
-                                                But TaskItem stops propagation on buttons. 
-                                                If I wrap TaskItem in a div with onClick, it should work as long as buttons stop prop.
-                                                TaskItem.tsx:
-                                                `return (<div className="...">...</div>)`
-                                                I can't pass onClick to TaskItem unless I modify it.
-                                                I'll just wrap it.
-                                            */}
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="text-center py-8 text-gray-500">
+                                <div className="text-center py-8 text-gray-500 col-span-full">
                                     No tasks match your filters.
                                 </div>
                             )}
@@ -223,16 +241,18 @@ const ToDoPage: React.FC = () => {
                     </Card>
                 </div>
 
-                {/* Right Column: 1/3 */}
-                <div className="lg:w-1/3">
-                    <Card title="Notifications">
-                        <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center min-h-[200px]">
-                            <Bell className="h-10 w-10 text-gray-300 mb-3" />
-                            <p>No new notifications.</p>
-                            <p className="text-xs text-gray-400 mt-1">Notifications will appear here later.</p>
-                        </div>
-                    </Card>
-                </div>
+                {/* Right Column: 1/3 - Notifications (Hidden for Admin) */}
+                {user?.title !== 'Administrator' && (
+                    <div className="lg:w-1/3">
+                        <Card title="Notifications">
+                            <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center min-h-[200px]">
+                                <Bell className="h-10 w-10 text-gray-300 mb-3" />
+                                <p>No new notifications.</p>
+                                <p className="text-xs text-gray-400 mt-1">Notifications will appear here later.</p>
+                            </div>
+                        </Card>
+                    </div>
+                )}
             </div>
 
             {/* Edit Modal */}
