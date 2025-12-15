@@ -657,7 +657,7 @@ const ReportsPage: React.FC = () => {
                                 top: 20,
                                 right: 30,
                                 left: 20,
-                                bottom: 5,
+                                bottom: 30,
                             }}
                         >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -670,7 +670,7 @@ const ReportsPage: React.FC = () => {
                             <Legend />
                             <Bar dataKey="caseNotes" name="Case Notes" stackId="a" fill="#4D7C7B" />
                             <Bar dataKey="workshops" name="Workshops Delivered" stackId="a" fill="#9CB072" />
-                            <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#D1D5DB" />
+                            <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#6B7280" />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
