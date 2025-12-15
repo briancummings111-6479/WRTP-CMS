@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../lib/firebase';
 import { User as AppUser, UserRole } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { Edit, Trash2, Save, X, UserPlus } from 'lucide-react';
+import { Edit, Trash2, Save, X, UserPlus, ShieldAlert } from 'lucide-react';
 
 const UsersPage: React.FC = () => {
     const { user: currentUser } = useAuth();
@@ -91,24 +91,24 @@ const UsersPage: React.FC = () => {
             return;
         }
 
-        if (!window.confirm(`Are you sure you want to merge all data from the Source user to the Target user? This action cannot be undone.`)) {
+        if (!window.confirm(`Are you sure you want to reassign all data from the Source user to the Target user? This action cannot be undone.`)) {
             return;
         }
 
-        setMergeStatus("Merging...");
+        setMergeStatus("Reassigning...");
         try {
             const result = await api.mergeUserData(mergeSourceId, mergeTargetId);
-            setMergeStatus(`Merge Complete! Moved: ${result.clients} clients, ${result.tasks} tasks, ${result.notes} notes, ${result.workshops} workshops.`);
-            alert(`Merge Successful!\n\nMoved:\n- ${result.clients} Clients\n- ${result.tasks} Tasks\n- ${result.notes} Notes\n- ${result.workshops} Workshops\n\nYou can now safely delete the empty Source user.`);
+            setMergeStatus(`Reassignment Complete! Moved: ${result.clients} clients, ${result.tasks} tasks, ${result.notes} notes, ${result.workshops} workshops.`);
+            alert(`Reassignment Successful!\n\nMoved:\n- ${result.clients} Clients\n- ${result.tasks} Tasks\n- ${result.notes} Notes\n- ${result.workshops} Workshops\n\nYou can now safely delete the empty Source user.`);
             setShowMergeModal(false);
             setMergeSourceId('');
             setMergeTargetId('');
             setMergeStatus(null);
             fetchUsers(); // Refresh to see any updates (though user list shouldn't change yet)
         } catch (error) {
-            console.error("Merge failed:", error);
-            setMergeStatus("Merge Failed. Check console.");
-            alert("Merge failed. Please check the console for details.");
+            console.error("Reassignment failed:", error);
+            setMergeStatus("Reassignment Failed. Check console.");
+            alert("Reassignment failed. Please check the console for details.");
         }
     };
 
@@ -141,24 +141,54 @@ const UsersPage: React.FC = () => {
         return <div className="p-6 text-red-600">Access Denied. Admin permissions required.</div>;
     }
 
+    const handleMigrateRoles = async () => {
+        if (!window.confirm("This will update all users who are NOT 'Administrator' to the 'Staff' role. Are you sure?")) return;
+
+        let count = 0;
+        for (const user of users) {
+            // Check if title is NOT Administrator (case-insensitive just in case) and role is currently admin
+            if (user.title && user.title.toLowerCase() !== 'administrator' && user.role === 'admin') {
+                try {
+                    console.log(`Migrating ${user.name} (${user.title}) from admin to staff...`);
+                    await api.updateUser({ ...user, role: 'viewer' });
+                    count++;
+                } catch (err) {
+                    console.error(`Failed to migrate ${user.name}`, err);
+                }
+            }
+        }
+        alert(`Migration complete. Updated ${count} users.`);
+        fetchUsers();
+    };
+
     return (
         <div className="p-6 max-w-6xl mx-auto">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-                <button
-                    onClick={() => setShowMergeModal(true)}
-                    className="bg-[#404E3B] text-white px-4 py-2 rounded hover:bg-[#333f2f] flex items-center"
-                >
-                    <UserPlus className="h-5 w-5 mr-2" />
-                    Merge Users
-                </button>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center ml-4"
-                >
-                    <UserPlus className="h-5 w-5 mr-2" />
-                    Add User
-                </button>
+                <div className="flex items-center space-x-4">
+                    <button
+                        onClick={handleMigrateRoles}
+                        className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 flex items-center"
+                        title="Fix Roles based on Title"
+                    >
+                        <ShieldAlert className="h-5 w-5 mr-2" />
+                        Fix Roles
+                    </button>
+                    <button
+                        onClick={() => { console.log('Merge modal clicked'); setShowMergeModal(true); }}
+                        className="bg-[#404E3B] text-white px-4 py-2 rounded hover:bg-[#333f2f] flex items-center"
+                    >
+                        <Edit className="h-5 w-5 mr-2" />
+                        Reassign User Account
+                    </button>
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+                    >
+                        <UserPlus className="h-5 w-5 mr-2" />
+                        Add User
+                    </button>
+                </div>
             </div>
 
             {/* Add User Modal */}
@@ -207,7 +237,7 @@ const UsersPage: React.FC = () => {
                                 value={addForm.role}
                                 onChange={(e) => setAddForm({ ...addForm, role: e.target.value as AppUser['role'] })}
                             >
-                                <option value="viewer">Viewer</option>
+                                <option value="viewer">Staff</option>
                                 <option value="admin">Admin</option>
                                 <option value="pending">Pending</option>
                             </select>
@@ -237,9 +267,9 @@ const UsersPage: React.FC = () => {
                 showMergeModal && (
                     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
                         <div className="bg-white p-5 rounded-lg shadow-xl w-96">
-                            <h2 className="text-xl font-bold mb-4">Merge User Accounts</h2>
+                            <h2 className="text-xl font-bold mb-4">Reassign User Account</h2>
                             <p className="text-sm text-gray-600 mb-4">
-                                Move all data from one user to another. Useful for fixing duplicate accounts.
+                                Move all data from one user to another. Useful for handing over accounts or fixing duplicates.
                             </p>
 
                             <div className="mb-4">
@@ -288,7 +318,7 @@ const UsersPage: React.FC = () => {
                                     disabled={!!mergeStatus && mergeStatus === "Merging..."}
                                     className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
                                 >
-                                    Merge Data
+                                    Reassign Data
                                 </button>
                             </div>
                         </div>
@@ -335,7 +365,7 @@ const UsersPage: React.FC = () => {
                                             className="border rounded px-2 py-1 w-full"
                                         >
                                             <option value="admin">Admin</option>
-                                            <option value="viewer">Viewer</option>
+                                            <option value="viewer">Staff</option>
                                             <option value="pending">Pending</option>
                                         </select>
                                     ) : (
@@ -343,7 +373,7 @@ const UsersPage: React.FC = () => {
                                             user.role === 'viewer' ? 'bg-blue-100 text-blue-800' :
                                                 'bg-yellow-100 text-yellow-800'
                                             }`}>
-                                            {user.role}
+                                            {user.role === 'viewer' ? 'Staff' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                                         </span>
                                     )}
                                 </td>

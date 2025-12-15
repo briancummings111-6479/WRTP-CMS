@@ -14,6 +14,7 @@ const StatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
         Scheduled: 'bg-blue-100 text-blue-800',
         'In Progress': 'bg-purple-100 text-purple-800',
         Completed: 'bg-green-100 text-green-800',
+        Canceled: 'bg-gray-100 text-gray-800',
         Declined: 'bg-yellow-100 text-yellow-800',
         'No Show': 'bg-red-100 text-red-800',
     };

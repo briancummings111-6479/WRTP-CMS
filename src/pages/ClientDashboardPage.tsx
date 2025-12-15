@@ -168,7 +168,7 @@ const ClientDashboardPage: React.FC = () => {
   const [isEditingAuditChecklist, setIsEditingAuditChecklist] = useState(false);
   const [isAuditChecklistSaving, setIsAuditChecklistSaving] = useState(false);
 
-  const tabs = ['Case Notes', 'Contact Notes', 'Intake', 'ISP', 'Audit Checklist', 'Certificates and CTE', 'Files'];
+  const tabs = ['Case Notes', 'Contact Notes', 'Intake', 'ISP', 'Audit Checklist', 'Training & Employment', 'Files'];
 
   const fetchClientData = async () => {
     if (!clientId) return;
@@ -595,8 +595,8 @@ const ClientDashboardPage: React.FC = () => {
                   </Card>
                 )}
 
-                {/* ----- 'Certificates and CTE' Tab Logic ----- */}
-                {activeTab === 'Certificates and CTE' && trainingData && (
+                {/* ----- 'Training & Employment' Tab Logic ----- */}
+                {activeTab === 'Training & Employment' && trainingData && (
                   <Card title="Training Status" titleAction={
                     !isEditingTraining ? (
                       <button
@@ -742,7 +742,7 @@ const ClientDashboardPage: React.FC = () => {
                   </Card>
                 )}
 
-                {activeTab === 'Certificates and CTE' && (
+                {activeTab === 'Training & Employment' && (
                   <div className="mt-6">
                     <AttachmentsSection clientId={client.id} category="Certificates" />
                   </div>

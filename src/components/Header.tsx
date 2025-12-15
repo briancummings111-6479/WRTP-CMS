@@ -34,7 +34,7 @@ const Header = () => {
           </div>
           <div>
             <p className="text-sm font-semibold text-white">{user?.name}</p>
-            <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
+            <p className="text-xs text-slate-400 capitalize">{user?.role === 'viewer' ? 'Staff' : user?.role}</p>
           </div>
         </div>
         <button
