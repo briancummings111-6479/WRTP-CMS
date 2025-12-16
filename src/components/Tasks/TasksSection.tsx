@@ -28,7 +28,19 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         api.getTasksByClientId(clientId),
         api.getStaffUsers()
       ]);
-      setTasks(tasksData.filter(t => t.status !== 'Completed').sort((a, b) => a.dueDate - b.dueDate));
+      // Custom sort: Active tasks first, then by dateCreated descending
+      const sortedTasks = tasksData.sort((a, b) => {
+        const aIsActive = a.status !== 'Completed';
+        const bIsActive = b.status !== 'Completed';
+
+        if (aIsActive && !bIsActive) return -1;
+        if (!aIsActive && bIsActive) return 1;
+
+        // If status priority is same, sort by dateCreated (newest first)
+        // Fallback to 0 if dateCreated is missing
+        return (b.dateCreated || 0) - (a.dateCreated || 0);
+      });
+      setTasks(sortedTasks);
       setAdmins(staffData.map((s: AppUser) => ({ id: s.uid, name: s.name })));
     } catch (error) {
       console.error("Failed to fetch tasks or admins:", error);
@@ -83,7 +95,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         title="Client's Tasks"
         titleAction={
           <div className="flex items-center gap-2">
-            {tasks.length > 3 && (
+            {tasks.length > 2 && (
               <button
                 onClick={() => setShowAll(!showAll)}
                 className="inline-flex items-center px-2 py-1 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -110,7 +122,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         ) : (
           <div className="space-y-3">
             {tasks.length > 0 ? (
-              (showAll ? tasks : tasks.slice(0, 3)).map(task => (
+              (showAll ? tasks : tasks.slice(0, 2)).map(task => (
                 <TaskItem
                   key={task.id}
                   task={task}
