@@ -37,7 +37,8 @@ import {
   ISP,
   Demographics,
   User as AppUser,
-  Workshop
+  Workshop,
+  Notification
 } from "../types";
 
 // --- Configuration ---
@@ -316,6 +317,22 @@ const api = {
       return task as Task;
     } else {
       const docRef = await addDoc(collection(db, "tasks"), sanitizeData(data));
+
+      // Notification Logic: If assigned to someone else, notify them
+      if (task.assignedToId && auth.currentUser && task.assignedToId !== auth.currentUser.uid) {
+        // We need to fetch the assigned user's name if not present, but usually we have it.
+        // Or we can just trust the ID.
+        await api.addNotification({
+          userId: task.assignedToId,
+          type: 'assignment',
+          message: `You have been assigned a new task: "${task.title}"`,
+          relatedItemId: docRef.id,
+          relatedItemType: 'task',
+          dateCreated: Date.now(),
+          read: false
+        });
+      }
+
       return { id: docRef.id, ...task } as Task;
     }
   },
@@ -441,6 +458,20 @@ const api = {
       return workshop as Workshop;
     } else {
       const docRef = await addDoc(collection(db, "workshops"), sanitizeData(data));
+
+      // Notification Logic: If assigned to someone else, notify them
+      if (workshop.assignedToId && auth.currentUser && workshop.assignedToId !== auth.currentUser.uid) {
+        await api.addNotification({
+          userId: workshop.assignedToId,
+          type: 'assignment',
+          message: `You have been assigned a new workshop: "${workshop.workshopName}"`,
+          relatedItemId: docRef.id,
+          relatedItemType: 'workshop',
+          dateCreated: Date.now(),
+          read: false
+        });
+      }
+
       return { id: docRef.id, ...workshop } as Workshop;
     }
   },
@@ -641,6 +672,23 @@ const api = {
       reader.onerror = error => reject(error);
       reader.readAsDataURL(file);
     });
+  },
+
+  // --- Notification Functions ---
+  getNotificationsByUserId: async (userId: string): Promise<Notification[]> => {
+    const q = query(collection(db, "notifications"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    return notifications.sort((a, b) => b.dateCreated - a.dateCreated);
+  },
+
+  addNotification: async (notification: Omit<Notification, "id">): Promise<Notification> => {
+    const docRef = await addDoc(collection(db, "notifications"), sanitizeData(notification));
+    return { id: docRef.id, ...notification } as Notification;
+  },
+
+  deleteNotification: async (notificationId: string): Promise<void> => {
+    await deleteDoc(doc(db, "notifications", notificationId));
   },
 };
 

@@ -295,3 +295,15 @@ export interface Workshop {
   assignedToName: string;
   associatedTaskId?: string; // ID of the task created for this workshop
 }
+
+// Notification Model
+export interface Notification {
+  id: string;
+  userId: string; // The user receiving the notification
+  type: 'assignment';
+  message: string;
+  relatedItemId?: string; // ID of the Task or Workshop
+  relatedItemType: 'task' | 'workshop';
+  dateCreated: number;
+  read: boolean;
+}

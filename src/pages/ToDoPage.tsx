@@ -2,17 +2,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/firebase';
-import { Task, User as AppUser } from '../types';
+import { Task, User as AppUser, Notification } from '../types';
 import Card from '../components/Card';
 import TaskItem from '../components/Tasks/TaskItem';
 import AddEditTaskModal from '../components/Tasks/AddEditTaskModal';
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 
 const ToDoPage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [staff, setStaff] = useState<AppUser[]>([]); // For refreshing tasks or task details if needed
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Filters
@@ -45,12 +46,14 @@ const ToDoPage: React.FC = () => {
                     // We can just always fetch staff since the list is likely small, or conditionally.
                     // Let's stick to original pattern but ensure we get all tasks for Admin.
 
-                    const [tasksData, staffData] = await Promise.all([
+                    const [tasksData, staffData, notificationsData] = await Promise.all([
                         tasksPromise,
-                        api.getStaffUsers()
+                        api.getStaffUsers(),
+                        api.getNotificationsByUserId(user.uid)
                     ]);
                     setTasks(tasksData);
                     setStaff(staffData);
+                    setNotifications(notificationsData);
                 } catch (error) {
                     console.error("Failed to fetch tasks:", error);
                 } finally {
@@ -113,6 +116,15 @@ const ToDoPage: React.FC = () => {
             } catch (error) {
                 console.error("Failed to delete task", error);
             }
+        }
+    };
+
+    const handleDeleteNotification = async (notificationId: string) => {
+        try {
+            await api.deleteNotification(notificationId);
+            setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        } catch (error) {
+            console.error("Failed to delete notification", error);
         }
     };
 
@@ -245,11 +257,33 @@ const ToDoPage: React.FC = () => {
                 {user?.title !== 'Administrator' && (
                     <div className="lg:w-1/3">
                         <Card title="Notifications">
-                            <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center min-h-[200px]">
-                                <Bell className="h-10 w-10 text-gray-300 mb-3" />
-                                <p>No new notifications.</p>
-                                <p className="text-xs text-gray-400 mt-1">Notifications will appear here later.</p>
-                            </div>
+                            {notifications.length > 0 ? (
+                                <div className="divide-y divide-gray-200">
+                                    {notifications.map(notification => (
+                                        <div key={notification.id} className="p-4 flex items-start gap-4">
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-900">{notification.message}</p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {new Date(notification.dateCreated).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteNotification(notification.id)}
+                                                className="text-gray-400 hover:text-gray-500"
+                                                aria-label="Close notification"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center min-h-[200px]">
+                                    <Bell className="h-10 w-10 text-gray-300 mb-3" />
+                                    <p>No new notifications.</p>
+                                    <p className="text-xs text-gray-400 mt-1">Notifications will appear here later.</p>
+                                </div>
+                            )}
                         </Card>
                     </div>
                 )}
