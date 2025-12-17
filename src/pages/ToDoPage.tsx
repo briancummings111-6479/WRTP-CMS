@@ -265,9 +265,12 @@ const ToDoPage: React.FC = () => {
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium text-gray-900">
                                                     {notification.relatedClientId ? (
-                                                        <a href={`/clients/${notification.relatedClientId}`} className="hover:underline hover:text-[#404E3B]">
+                                                        <span
+                                                            onClick={() => navigate(`/clients/${notification.relatedClientId}`)}
+                                                            className="hover:underline hover:text-[#404E3B] cursor-pointer"
+                                                        >
                                                             {notification.message}
-                                                        </a>
+                                                        </span>
                                                     ) : (
                                                         notification.message
                                                     )}
