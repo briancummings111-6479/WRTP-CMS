@@ -304,6 +304,7 @@ export interface Notification {
   message: string;
   relatedItemId?: string; // ID of the Task or Workshop
   relatedItemType: 'task' | 'workshop';
+  relatedClientId?: string;
   dateCreated: number;
   read: boolean;
 }

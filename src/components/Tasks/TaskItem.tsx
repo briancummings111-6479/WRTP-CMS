@@ -1,12 +1,13 @@
 import React from 'react';
 import { Task } from '../../types';
 import { useAuth } from '../../context/AuthContext';
-import { Calendar, User, Edit, Trash2, Flame, AlertTriangle, Circle, Link } from 'lucide-react';
+import { Calendar, User, Edit, Trash2, Flame, AlertTriangle, Circle, Link, Bell } from 'lucide-react';
 
 interface TaskItemProps {
     task: Task;
     onEdit: (task: Task) => void;
     onDelete: (taskId: string) => void;
+    hasNotification?: boolean;
 }
 
 const UrgencyBadge: React.FC<{ urgency: Task['urgency'] }> = ({ urgency }) => {
@@ -52,7 +53,7 @@ const StatusBadge: React.FC<{ status: Task['status'] }> = ({ status }) => {
 };
 
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotification }) => {
     const { user } = useAuth();
     const isAdmin = user?.role === 'admin';
 
@@ -64,7 +65,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete }) => {
     }
 
     return (
-        <div className="p-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+        <div className="p-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors relative">
+            {hasNotification && (
+                <div className="absolute -top-2 -right-2 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 z-10">
+                    <Bell className="h-5 w-5 text-red-500 fill-current" />
+                </div>
+            )}
             <div className="flex justify-between items-start">
                 <p className="text-sm font-medium text-gray-800 flex-1 pr-2 truncate">{task.title}</p>
 

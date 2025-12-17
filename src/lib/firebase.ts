@@ -328,6 +328,7 @@ const api = {
           message: `You have been assigned a new task: "${task.title}"`,
           relatedItemId: docRef.id,
           relatedItemType: 'task',
+          relatedClientId: task.clientId,
           dateCreated: Date.now(),
           read: false
         });
@@ -467,6 +468,7 @@ const api = {
           message: `You have been assigned a new workshop: "${workshop.workshopName}"`,
           relatedItemId: docRef.id,
           relatedItemType: 'workshop',
+          relatedClientId: workshop.clientId,
           dateCreated: Date.now(),
           read: false
         });

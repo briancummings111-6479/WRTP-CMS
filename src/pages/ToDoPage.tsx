@@ -240,6 +240,7 @@ const ToDoPage: React.FC = () => {
                                                 task={task}
                                                 onEdit={handleEditTask}
                                                 onDelete={handleDeleteTask}
+                                                hasNotification={notifications.some(n => n.relatedItemId === task.id)}
                                             />
                                         </div>
                                     </div>
@@ -262,7 +263,15 @@ const ToDoPage: React.FC = () => {
                                     {notifications.map(notification => (
                                         <div key={notification.id} className="p-4 flex items-start gap-4">
                                             <div className="flex-1">
-                                                <p className="text-sm font-medium text-gray-900">{notification.message}</p>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {notification.relatedClientId ? (
+                                                        <a href={`/clients/${notification.relatedClientId}`} className="hover:underline hover:text-[#404E3B]">
+                                                            {notification.message}
+                                                        </a>
+                                                    ) : (
+                                                        notification.message
+                                                    )}
+                                                </p>
                                                 <p className="text-xs text-gray-500 mt-1">
                                                     {new Date(notification.dateCreated).toLocaleDateString()}
                                                 </p>
@@ -285,23 +294,25 @@ const ToDoPage: React.FC = () => {
                                 </div>
                             )}
                         </Card>
-                    </div>
+                    </div >
                 )}
-            </div>
+            </div >
 
             {/* Edit Modal */}
-            {taskToEdit && (
-                <AddEditTaskModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
-                    onSave={handleSaveTask}
-                    taskToEdit={taskToEdit}
-                    clientId={taskToEdit.clientId}
-                    clientName={taskToEdit.clientName}
-                    admins={staff.map(s => ({ id: s.uid, name: s.name }))}
-                />
-            )}
-        </div>
+            {
+                taskToEdit && (
+                    <AddEditTaskModal
+                        isOpen={isEditModalOpen}
+                        onClose={() => setIsEditModalOpen(false)}
+                        onSave={handleSaveTask}
+                        taskToEdit={taskToEdit}
+                        clientId={taskToEdit.clientId}
+                        clientName={taskToEdit.clientName}
+                        admins={staff.map(s => ({ id: s.uid, name: s.name }))}
+                    />
+                )
+            }
+        </div >
     );
 };
 
