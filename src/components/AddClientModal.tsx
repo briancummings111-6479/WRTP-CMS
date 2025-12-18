@@ -69,6 +69,7 @@ const initialFormData = {
         assignedAdminName: '',
         clientType: 'General Population' as Client['metadata']['clientType'],
         status: 'Prospect' as Client['metadata']['status'],
+        dateApplication: new Date().toISOString().split('T')[0], // Default to today
     },
 };
 
@@ -145,7 +146,15 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         if (!user) return;
         setIsSaving(true);
         try {
-            const newClient = await api.addClient(formData, user.uid);
+            const submissionData = {
+                ...formData,
+                metadata: {
+                    ...formData.metadata,
+                    // Convert date string to timestamp for storage
+                    dateApplication: formData.metadata.dateApplication ? new Date(formData.metadata.dateApplication).getTime() : undefined,
+                }
+            };
+            const newClient = await api.addClient(submissionData, user.uid);
             onSave(newClient);
         } catch (error) {
             console.error("Failed to add client:", error);
@@ -200,7 +209,16 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                         <fieldset className="space-y-4 p-4 border border-[#d1d1d1] rounded-md">
                             <legend className="text-lg font-medium text-gray-700 px-1">Case Management</legend>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><label className="label">Client Status</label><select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input"><option value="Prospect">Prospect</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                                <div>
+                                    <label className="label">Client Status</label>
+                                    <select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input">
+                                        <option value="Prospect">Prospect</option>
+                                        <option value="Applicant">Applicant</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div><label className="label">Date Added</label><input type="date" name="dateApplication" value={formData.metadata.dateApplication} onChange={handleMetadataChange} className="form-input" /></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
                                 {/* Removed 'required' from Assigned Case Manager */}
                                 <div>

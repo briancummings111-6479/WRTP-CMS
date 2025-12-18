@@ -172,7 +172,7 @@ export interface Client {
     createdBy: string; // UID
     lastModified: number; // Timestamp
     lastModifiedBy: string; // UID
-    status: 'Prospect' | 'Active' | 'Inactive';
+    status: 'Prospect' | 'Applicant' | 'Active' | 'Inactive';
     clientType: 'General Population' | 'CHYBA';
     assignedAdminId?: string; // UID
     assignedAdminName?: string;
