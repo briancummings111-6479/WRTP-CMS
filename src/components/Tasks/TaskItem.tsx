@@ -64,8 +64,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotifica
         }
     }
 
+    const isGeneralTask = !task.clientId;
+
     return (
-        <div className="p-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors relative">
+        <div className={`p-3 rounded-md border border-gray-200 hover:bg-opacity-80 transition-colors relative ${isGeneralTask ? 'bg-[#FFF9C4]' : 'bg-white hover:bg-gray-50'}`}>
             {hasNotification && (
                 <div className="absolute -top-2 -right-2 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 z-10">
                     <Bell className="h-5 w-5 text-red-500 fill-current" />
@@ -107,16 +109,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotifica
                         )}
                         Due: {new Date(task.dueDate).toLocaleDateString()}
                     </p>
-                    <p className="flex items-center">
-                        <User className="h-3 w-3 mr-1.5" />
-                        Client: {task.clientName}
-                        {task.serviceType && (
-                            <>
-                                <span className="mx-2 text-gray-300">|</span>
-                                {task.serviceType}
-                            </>
-                        )}
-                    </p>
+                    {task.clientName && (
+                        <p className="flex items-center">
+                            <User className="h-3 w-3 mr-1.5" />
+                            Client: {task.clientName}
+                            {task.serviceType && (
+                                <>
+                                    <span className="mx-2 text-gray-300">|</span>
+                                    {task.serviceType}
+                                </>
+                            )}
+                        </p>
+                    )}
                     <p className="flex items-center">
                         <User className="h-3 w-3 mr-1.5" />
                         For: {task.assignedToName}

@@ -185,8 +185,8 @@ export interface Client {
 // Task Data Model
 export interface Task {
   id: string;
-  clientId: string;
-  clientName: string;
+  clientId?: string;
+  clientName?: string;
   assignedToId: string; // UID
   assignedToName: string;
   createdBy: string; // Name

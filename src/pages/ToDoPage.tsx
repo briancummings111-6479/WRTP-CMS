@@ -6,7 +6,7 @@ import { Task, User as AppUser, Notification } from '../types';
 import Card from '../components/Card';
 import TaskItem from '../components/Tasks/TaskItem';
 import AddEditTaskModal from '../components/Tasks/AddEditTaskModal';
-import { Bell, X } from 'lucide-react';
+import { Bell, X, Plus } from 'lucide-react';
 
 const ToDoPage: React.FC = () => {
     const { user } = useAuth();
@@ -143,6 +143,11 @@ const ToDoPage: React.FC = () => {
         setTaskToEdit(null);
     };
 
+    const handleNewGeneralTask = () => {
+        setTaskToEdit(null);
+        setIsEditModalOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
@@ -152,7 +157,18 @@ const ToDoPage: React.FC = () => {
                 <div className={`${user?.title === 'Administrator' ? 'w-full' : 'lg:w-2/3'} space-y-4`}>
 
                     {/* Filters */}
-                    <Card>
+                    <Card
+                        title="Filters"
+                        titleAction={
+                            <button
+                                onClick={handleNewGeneralTask}
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-[#404E3B] hover:bg-[#5a6c53] shadow-sm"
+                            >
+                                <Plus className="h-4 w-4 mr-1" />
+                                New Task
+                            </button>
+                        }
+                    >
                         <div className={`p-4 grid grid-cols-1 md:grid-cols-2 gap-4 ${user?.title === 'Administrator' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                             {user?.title === 'Administrator' && (
                                 <div>
@@ -234,7 +250,11 @@ const ToDoPage: React.FC = () => {
                                 <div className="text-center py-4 text-gray-500 col-span-full">Loading tasks...</div>
                             ) : filteredTasks.length > 0 ? (
                                 filteredTasks.map(task => (
-                                    <div key={task.id} onClick={() => navigate(`/clients/${task.clientId}`)} className="cursor-pointer group h-full">
+                                    <div
+                                        key={task.id}
+                                        onClick={() => task.clientId && navigate(`/clients/${task.clientId}`)}
+                                        className={`cursor-pointer group h-full ${!task.clientId ? 'cursor-default' : ''}`}
+                                    >
                                         <div className="relative h-full">
                                             <TaskItem
                                                 task={task}
@@ -309,8 +329,8 @@ const ToDoPage: React.FC = () => {
                         onClose={() => setIsEditModalOpen(false)}
                         onSave={handleSaveTask}
                         taskToEdit={taskToEdit}
-                        clientId={taskToEdit.clientId}
-                        clientName={taskToEdit.clientName}
+                        clientId={taskToEdit?.clientId}
+                        clientName={taskToEdit?.clientName}
                         admins={staff.map(s => ({ id: s.uid, name: s.name }))}
                     />
                 )

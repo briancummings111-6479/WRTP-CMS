@@ -9,8 +9,8 @@ interface AddEditTaskModalProps {
   onClose: () => void;
   onSave: (task: Task) => void;
   taskToEdit?: Task | null;
-  clientId: string;
-  clientName: string;
+  clientId?: string;
+  clientName?: string;
   admins: { id: string, name: string }[];
 }
 
@@ -57,8 +57,8 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
 
     const taskData = {
       id: taskToEdit?.id,
-      clientId: clientId,
-      clientName: clientName,
+      clientId: clientId || taskToEdit?.clientId,
+      clientName: clientName || taskToEdit?.clientName,
       title: title,
       dueDate: new Date(dueDate).getTime(),
       dateCreated: taskToEdit?.dateCreated || Date.now(),
@@ -91,7 +91,9 @@ const AddEditTaskModal: React.FC<AddEditTaskModalProps> = ({ isOpen, onClose, on
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start p-4 pt-16" aria-modal="true" role="dialog">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
-          <h2 className="text-xl font-semibold text-gray-800">{taskToEdit ? 'Edit Task' : 'Add New Task'} for {clientName}</h2>
+          <h2 className="text-xl font-semibold text-gray-800">
+            {taskToEdit ? 'Edit Task' : 'Add New Task'} {clientName ? `for ${clientName}` : '(General)'}
+          </h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200" aria-label="Close modal">
             <X className="h-6 w-6 text-gray-600" />
           </button>
