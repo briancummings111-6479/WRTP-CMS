@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/firebase';
 import { Client, ISP, AuditChecklist, AuditChecklistItem, User as AppUser, CaseNote, Workshop, ClientAttachment } from '../types';
 import Card from '../components/Card';
-import { User, Phone, Mail, Home, Edit, Link, Check, X, Save } from 'lucide-react';
+import { User, Phone, Mail, Home, Edit, Link, Check, X, Save, Printer } from 'lucide-react';
 import EditClientModal from '../components/EditClientModal';
 import { useAuth } from '../context/AuthContext';
 import CaseNotesSection from '../components/CaseNotes/CaseNotesSection';
@@ -342,6 +342,68 @@ const ClientDashboardPage: React.FC = () => {
     setIsEditingAuditChecklist(false);
   };
 
+  const generateAuditChecklistPrintHTML = () => {
+    if (!auditChecklistData || !client) return '';
+
+    const rowsHTML = auditChecklistData.map(item => `
+      <tr class="${item.complete ? 'bg-gray-50' : ''}">
+        <td class="p-2 border font-medium">${item.label}</td>
+        <td class="p-2 border text-center">${item.complete ? '✓' : ''}</td>
+        <td class="p-2 border text-center">${item.uploaded ? '✓' : ''}</td>
+        <td class="p-2 border">${item.notes || ''}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <html>
+      <head>
+          <title>Audit Checklist - ${client.profile.firstName} ${client.profile.lastName}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style> body { font-family: sans-serif; } @media print { .no-print { display: none; } } </style>
+      </head>
+      <body class="p-8">
+          <header class="mb-6">
+              <h1 class="text-2xl font-bold mb-2">Audit Checklist</h1>
+              <div class="text-gray-600">
+                  <p><span class="font-semibold">Client:</span> ${client.profile.firstName} ${client.profile.lastName}</p>
+                  <p><span class="font-semibold">Date:</span> ${new Date().toLocaleDateString()}</p>
+              </div>
+          </header>
+          <main>
+              <table class="w-full border-collapse border text-sm">
+                  <thead>
+                      <tr class="bg-gray-100">
+                          <th class="p-2 border text-left w-1/3">Item</th>
+                          <th class="p-2 border text-center w-16">Complete</th>
+                          <th class="p-2 border text-center w-16">Uploaded</th>
+                          <th class="p-2 border text-left">Notes</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${rowsHTML}
+                  </tbody>
+              </table>
+          </main>
+      </body>
+      </html>
+    `;
+  };
+
+  const handlePrintAuditChecklist = () => {
+    const printContent = generateAuditChecklistPrintHTML();
+    if (printContent) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      }
+    }
+  };
+
   // --- Audit Checklist Automation Logic ---
   useEffect(() => {
     if (!client || !auditChecklistData) return;
@@ -540,13 +602,22 @@ const ClientDashboardPage: React.FC = () => {
                 {activeTab === 'Audit Checklist' && auditChecklistData && (
                   <Card title="Audit Checklist" titleAction={
                     !isEditingAuditChecklist ? (
-                      <button
-                        onClick={() => setIsEditingAuditChecklist(true)}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        <Edit className="h-4 w-4 mr-2 text-gray-500" />
-                        Edit
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={handlePrintAuditChecklist}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          <Printer className="h-4 w-4 mr-2 text-gray-500" />
+                          Print
+                        </button>
+                        <button
+                          onClick={() => setIsEditingAuditChecklist(true)}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          <Edit className="h-4 w-4 mr-2 text-gray-500" />
+                          Edit
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex justify-end space-x-3">
                         <button
@@ -752,7 +823,7 @@ const ClientDashboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div >
       </div >
 
       {client && (
