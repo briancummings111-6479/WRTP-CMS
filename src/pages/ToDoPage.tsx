@@ -323,7 +323,7 @@ const ToDoPage: React.FC = () => {
 
             {/* Edit Modal */}
             {
-                taskToEdit && (
+                isEditModalOpen && (
                     <AddEditTaskModal
                         isOpen={isEditModalOpen}
                         onClose={() => setIsEditModalOpen(false)}
