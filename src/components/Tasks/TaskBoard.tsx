@@ -8,6 +8,7 @@ interface TaskBoardProps {
     onStatusChange: (task: Task, newStatus: Task['status']) => void;
     onTaskClick: (task: Task) => void;
     onEdit: (task: Task) => void;
+    onDelete: (taskId: string) => void;
 }
 
 const COLUMNS: { id: Task['status']; label: string }[] = [
@@ -16,7 +17,7 @@ const COLUMNS: { id: Task['status']; label: string }[] = [
     { id: 'Waiting', label: 'WAITING' }
 ];
 
-const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onStatusChange, onTaskClick, onEdit }) => {
+const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onStatusChange, onTaskClick, onEdit, onDelete }) => {
 
     const getTasksByStatus = (status: Task['status']) => {
         return tasks.filter(task => task.status === status);
@@ -43,6 +44,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, onStatusChange, onTaskClic
                                     onStatusChange={onStatusChange}
                                     onClick={onTaskClick}
                                     onEdit={onEdit}
+                                    onDelete={onDelete}
+                                    hasNotification={false}
                                 />
                             ))}
                             {columnTasks.length === 0 && (

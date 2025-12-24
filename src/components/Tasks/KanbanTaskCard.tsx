@@ -1,40 +1,54 @@
 
 import React from 'react';
 import { Task } from '../../types';
-import { User, Calendar, Edit2 } from 'lucide-react';
+import { Calendar, User, Edit, Trash2, Flame, AlertTriangle, Circle, Link, Bell } from 'lucide-react';
 
 interface KanbanTaskCardProps {
     task: Task;
     onStatusChange: (task: Task, newStatus: Task['status']) => void;
     onClick: (task: Task) => void;
     onEdit: (task: Task) => void;
+    onDelete: (taskId: string) => void;
+    hasNotification?: boolean;
 }
 
-const urgencyConfig = {
-    Green: {
-        color: 'bg-green-500',
-        badgeBg: 'bg-green-100',
-        badgeText: 'text-green-800',
-        label: 'NORMAL'
-    },
-    Yellow: {
-        color: 'bg-yellow-500',
-        badgeBg: 'bg-yellow-100',
-        badgeText: 'text-yellow-800',
-        label: 'YELLOW'
-    },
-    Red: {
-        color: 'bg-red-500',
-        badgeBg: 'bg-red-100',
-        badgeText: 'text-red-800',
-        label: 'RED'
-    }
+const UrgencyBadge: React.FC<{ urgency: Task['urgency'] }> = ({ urgency }) => {
+    const urgencyConfig = {
+        Green: {
+            styles: 'bg-green-100 text-green-800',
+            icon: <Circle className="h-3 w-3 mr-1.5" />,
+            text: 'Normal'
+        },
+        Yellow: {
+            styles: 'bg-yellow-100 text-yellow-800',
+            icon: <AlertTriangle className="h-3 w-3 mr-1.5" />,
+            text: 'Medium'
+        },
+        Red: {
+            styles: 'bg-red-100 text-red-800',
+            icon: <Flame className="h-3 w-3 mr-1.5" />,
+            text: 'High'
+        },
+    };
+    const config = urgencyConfig[urgency];
+    return (
+        <span className={`px-2.5 py-1 inline-flex items-center text-xs font-medium rounded-full ${config.styles}`}>
+            {config.icon}
+            {config.text}
+        </span>
+    );
 };
 
 const statusOptions: Task['status'][] = ['Open', 'In Progress', 'Waiting', 'Completed'];
 
-const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onStatusChange, onClick, onEdit }) => {
-    const config = urgencyConfig[task.urgency];
+const statusConfig: { [key in Task['status']]: { styles: string } } = {
+    Open: { styles: 'bg-blue-100 text-blue-800' },
+    'In Progress': { styles: 'bg-purple-100 text-purple-800' },
+    Waiting: { styles: 'bg-yellow-100 text-yellow-800' },
+    Completed: { styles: 'bg-green-100 text-green-800' },
+};
+
+const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onStatusChange, onClick, onEdit, onDelete, hasNotification }) => {
 
     const handleStatusClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -44,58 +58,114 @@ const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onStatusChange, o
         onStatusChange(task, e.target.value as Task['status']);
     };
 
-    const handleEditClick = (e: React.MouseEvent) => {
+    const handleEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
         onEdit(task);
     }
 
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (window.confirm(`Are you sure you want to delete the task "${task.title}"?`)) {
+            onDelete(task.id);
+        }
+    }
+
+    const isGeneralTask = !task.clientId;
+    const currentStatusConfig = statusConfig[task.status] || statusConfig['Open'];
+
     return (
         <div
             onClick={() => onClick(task)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow relative group"
+            className={`p-3 rounded-md border border-gray-200 hover:bg-opacity-80 transition-colors relative cursor-pointer ${isGeneralTask ? 'bg-[#FFF9C4]' : 'bg-white hover:bg-gray-50'}`}
         >
-            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${config.color}`} />
+            {hasNotification && (
+                <div className="absolute -top-2 -right-2 bg-white rounded-full p-0.5 shadow-sm border border-gray-100 z-10">
+                    <Bell className="h-5 w-5 text-red-500 fill-current" />
+                </div>
+            )}
 
-            <div className="p-4 pl-5"> {/* Extra padding-left for the border */}
-                <div className="flex justify-between items-start mb-3">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold uppercase ${config.badgeBg} ${config.badgeText}`}>
-                        {config.label}
-                    </span>
-                    <button
-                        onClick={handleEditClick}
-                        className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Edit task"
-                    >
-                        <Edit2 className="w-4 h-4" />
+            {/* Header: Title + Actions */}
+            <div className="flex justify-between items-start">
+                <p className="text-sm font-medium text-gray-800 flex-1 pr-2 truncate">{task.title}</p>
+
+                <div className="flex-shrink-0 flex items-center space-x-2">
+                    {task.linkTo && (
+                        <a
+                            href={task.linkTo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-[#404E3B]"
+                            aria-label="Open task link"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Link className="h-4 w-4" />
+                        </a>
+                    )}
+                    <button onClick={handleEdit} className="text-gray-400 hover:text-[#404E3B]" aria-label="Edit task">
+                        <Edit className="h-4 w-4" />
+                    </button>
+                    <button onClick={handleDelete} className="text-gray-400 hover:text-red-600" aria-label="Delete task">
+                        <Trash2 className="h-4 w-4" />
                     </button>
                 </div>
+            </div>
 
-                <h3 className="text-gray-900 font-semibold mb-1 line-clamp-2 leading-tight">
-                    {task.title}
-                </h3>
-
-                <div className="flex items-center text-gray-500 text-sm mb-4">
-                    <User className="w-3.5 h-3.5 mr-1.5" />
-                    <span>{task.assignedToName}</span>
+            {/* Content Row */}
+            <div className="flex justify-between items-end mt-2">
+                {/* Information Column */}
+                <div className="text-xs text-gray-500 space-y-1">
+                    <p className="flex items-center">
+                        <Calendar className="h-3 w-3 mr-1.5" />
+                        {task.dateCreated && (
+                            <>
+                                Created: {new Date(task.dateCreated).toLocaleDateString()}
+                                <span className="mx-2 text-gray-300">|</span>
+                            </>
+                        )}
+                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                    </p>
+                    {task.clientName && (
+                        <p className="flex items-center">
+                            <User className="h-3 w-3 mr-1.5" />
+                            Client: {task.clientName}
+                            {task.serviceType && (
+                                <>
+                                    <span className="mx-2 text-gray-300">|</span>
+                                    {task.serviceType}
+                                </>
+                            )}
+                        </p>
+                    )}
+                    <p className="flex items-center">
+                        <User className="h-3 w-3 mr-1.5" />
+                        For: {task.assignedToName}
+                        <span className="mx-2 text-gray-300">|</span>
+                        By: {task.createdBy}
+                    </p>
                 </div>
 
-                <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center text-gray-500 text-xs">
-                        <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                        <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                    </div>
-
-                    <div onClick={handleStatusClick}>
+                {/* Status & Urgency Column */}
+                <div className="flex flex-col items-end space-y-2">
+                    {/* Status Dropdown disguised as Badge */}
+                    <div onClick={handleStatusClick} className="relative">
                         <select
                             value={task.status}
                             onChange={handleSelectChange}
-                            className="text-xs border-none bg-transparent font-medium text-gray-700 hover:bg-gray-50 rounded focus:ring-0 cursor-pointer pr-6 py-0 disabled:opacity-50"
+                            className={`appearance-none pl-2.5 pr-6 py-1 text-xs font-medium rounded-full border-none focus:ring-1 focus:ring-offset-1 focus:ring-[#404E3B] cursor-pointer ${currentStatusConfig.styles}`}
                         >
                             {statusOptions.map(option => (
                                 <option key={option} value={option}>{option}</option>
                             ))}
                         </select>
+                        {/* Custom Arrow/Indicator if needed, but appearance-none removes default arrow. 
+                            If we remove appearance-none, we get the default arrow which might be fine.
+                            Let's keep default appearance or add a custom arrow.
+                            TaskItem has no dropdown. 
+                            Let's use default appearance but small text.
+                        */}
                     </div>
+
+                    <UrgencyBadge urgency={task.urgency} />
                 </div>
             </div>
         </div>

@@ -273,6 +273,7 @@ const ToDoPage: React.FC = () => {
                                 }
                             }}
                             onEdit={handleEditTask}
+                            onDelete={handleDeleteTask}
                         />
                     ) : (
                         <Card title="My Tasks">
