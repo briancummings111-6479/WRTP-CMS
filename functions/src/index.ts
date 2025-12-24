@@ -11,7 +11,12 @@ import { setGlobalOptions } from "firebase-functions";
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
+import * as admin from "firebase-admin";
+
+admin.initializeApp();
+
 // For cost control...
 setGlobalOptions({ maxInstances: 10 });
 
 export * from "./ocr";
+export * from "./analysis";

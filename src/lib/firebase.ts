@@ -651,6 +651,13 @@ const api = {
     }
   },
 
+  // --- AI Analysis Functions ---
+  analyzeClientProgress: async (clientId: string): Promise<{ servicesProvided: string[], progressToGoals: string }> => {
+    const analyzeFn = httpsCallable<{ clientId: string }, { servicesProvided: string[], progressToGoals: string }>(functions, 'analyzeClientProgress');
+    const result = await analyzeFn({ clientId });
+    return result.data;
+  },
+
   // --- OCR Functions ---
   extractFormData: async (file: File, formType: 'Intake' | 'ISP'): Promise<any> => {
     // Convert file to Base64
