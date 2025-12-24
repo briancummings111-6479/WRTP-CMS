@@ -86,6 +86,12 @@ export const analyzeClientProgress = onCall<AnalysisRequest>(async (request) => 
         const jsonString = text.replace(/```json/g, "").replace(/```/g, "").trim();
         const analysis = JSON.parse(jsonString);
 
+        // Save to Firestore
+        await db.collection("clientSummaries").doc(clientId).set({
+            ...analysis,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        });
+
         return analysis;
 
     } catch (error: any) {

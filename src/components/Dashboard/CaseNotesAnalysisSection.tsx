@@ -17,6 +17,20 @@ const CaseNotesAnalysisSection: React.FC<CaseNotesAnalysisSectionProps> = ({ cli
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    React.useEffect(() => {
+        const fetchSummary = async () => {
+            try {
+                const summary = await api.getClientSummary(clientId);
+                if (summary) {
+                    setAnalysis(summary);
+                }
+            } catch (err) {
+                console.error("Failed to fetch existing summary", err);
+            }
+        };
+        fetchSummary();
+    }, [clientId]);
+
     const handleAnalyze = async () => {
         setLoading(true);
         setError(null);
