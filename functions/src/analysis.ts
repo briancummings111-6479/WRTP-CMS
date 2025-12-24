@@ -4,16 +4,14 @@ import { VertexAI } from "@google-cloud/vertexai";
 
 // Initialize Vertex AI
 // Note: This requires the correct project location to be set, or it defaults to us-central1
-// Force the known working GCP Project ID, ignoring the Firebase emulator's default
-const project = "briancummings111-6479";
+// Using process.env.GCLOUD_PROJECT ensures we target the project the function is deployed to.
+const project = process.env.GCLOUD_PROJECT || "wrtp-cms";
 console.log(`Initializing Vertex AI with project: ${project}`);
 
 const vertexAI = new VertexAI({ project: project, location: "us-central1" });
 
 const model = vertexAI.getGenerativeModel({
-    model: "gemini-1.5-flash-001", // Using 1.5 Flash as requested (Flash 3.0 might be a misnomer or future version, sticking to standard stable flash for now or checking)
-    // The user asked for "Gemini API Flash 3.0", which might be "gemini-1.5-flash" (latest stable).
-    // I will use "gemini-1.5-flash" which is the current standard for "Flash".
+    model: "gemini-2.5-flash",
 });
 
 interface AnalysisRequest {
@@ -21,6 +19,8 @@ interface AnalysisRequest {
 }
 
 export const analyzeClientProgress = onCall<AnalysisRequest>(async (request) => {
+    console.log(`[analyzeClientProgress] Runtime Project ID: ${process.env.GCLOUD_PROJECT}`);
+
     if (!request.auth) {
         throw new Error("Unauthenticated");
     }
