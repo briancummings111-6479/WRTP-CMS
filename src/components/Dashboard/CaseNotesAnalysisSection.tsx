@@ -10,6 +10,7 @@ interface CaseNotesAnalysisSectionProps {
 interface AnalysisResult {
     servicesProvided: string[];
     progressToGoals: string;
+    lastUpdated?: any;
 }
 
 const CaseNotesAnalysisSection: React.FC<CaseNotesAnalysisSectionProps> = ({ clientId }) => {
@@ -36,7 +37,11 @@ const CaseNotesAnalysisSection: React.FC<CaseNotesAnalysisSectionProps> = ({ cli
         setError(null);
         try {
             const result = await api.analyzeClientProgress(clientId);
-            setAnalysis(result);
+            // Result from API call doesn't match the full AnalysisResult with lastUpdated immediately unless we refresh or mock it.
+            // But since we want to show it immediately, we can fake it or just show "Just now".
+            // The API returns { servicesProvided, progressToGoals }.
+            // We should probably just set it to Date.now() for display purposes until refresh.
+            setAnalysis({ ...result, lastUpdated: { toMillis: () => Date.now() } });
         } catch (err: any) {
             console.error("Analysis failed", err);
             setError("Failed to analyze progress. Please try again later.");
@@ -45,27 +50,40 @@ const CaseNotesAnalysisSection: React.FC<CaseNotesAnalysisSectionProps> = ({ cli
         }
     };
 
+    const formatDate = (timestamp: any) => {
+        if (!timestamp) return "";
+        const date = typeof timestamp.toMillis === 'function' ? new Date(timestamp.toMillis()) : new Date(timestamp);
+        return date.toLocaleString();
+    };
+
     return (
         <Card
             title="Services & Progress Analysis"
             titleAction={
-                <button
-                    onClick={handleAnalyze}
-                    disabled={loading}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400"
-                >
-                    {loading ? (
-                        <>
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            Analyzing...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            {analysis ? "Re-Analyze" : "Analyze Progress"}
-                        </>
+                <div className="flex items-center space-x-4">
+                    {analysis && analysis.lastUpdated && (
+                        <span className="text-xs text-gray-500 hidden sm:inline-block">
+                            Last Updated: {formatDate(analysis.lastUpdated)}
+                        </span>
                     )}
-                </button>
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={loading}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-400"
+                    >
+                        {loading ? (
+                            <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                Analyzing...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                {analysis ? "Re-Analyze" : "Analyze Progress"}
+                            </>
+                        )}
+                    </button>
+                </div>
             }
         >
             <div className="space-y-4">
