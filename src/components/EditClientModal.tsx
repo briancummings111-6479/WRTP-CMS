@@ -139,7 +139,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
                   </select>
                 </div>
                 <div>
-                  <label className="label">Date Enrolled</label>
+                  <label className="label">Date Added</label>
                   <input
                     type="date"
                     name="metadata.dateApplication"

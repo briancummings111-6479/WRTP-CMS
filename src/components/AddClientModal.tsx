@@ -218,7 +218,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                         <option value="Inactive">Inactive</option>
                                     </select>
                                 </div>
-                                <div><label className="label">Date Enrolled</label><input type="date" name="dateApplication" value={formData.metadata.dateApplication} onChange={handleMetadataChange} className="form-input" /></div>
+                                <div><label className="label">Date Added</label><input type="date" name="dateApplication" value={formData.metadata.dateApplication} onChange={handleMetadataChange} className="form-input" /></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
                                 {/* Removed 'required' from Assigned Case Manager */}
                                 <div>
