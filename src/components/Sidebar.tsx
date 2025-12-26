@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Users, BarChart2, Download, ClipboardList, Upload } from 'lucide-react';
+import { Home, Users, BarChart2, Download, ClipboardList, Upload, FileBarChart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const commonNavItems: { to: string; text: string; icon: React.ElementType }[] = [
@@ -12,7 +12,9 @@ const commonNavItems: { to: string; text: string; icon: React.ElementType }[] = 
 const adminNavItems: { to: string; text: string; icon: React.ElementType }[] = [
   { to: '/users', text: 'Users', icon: Users },
   { to: '/export', text: 'Data Export', icon: Download },
+
   { to: '/import', text: 'Data Import', icon: Upload },
+  { to: '/grant-report', text: 'Grant Reports', icon: FileBarChart },
 ];
 
 // FIX: Use React.FC to correctly type the component, which allows React's special 'key' prop to be used without TypeScript errors.
@@ -33,7 +35,7 @@ const NavItem: React.FC<{ to: string, text: string, icon: React.ElementType }> =
 
 const Sidebar = () => {
   const { user } = useAuth();
-  const isAdmin = user?.title === 'Administrator';
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="w-64 bg-[#6C8480] border-r border-[#5a6e69] flex flex-col no-print">

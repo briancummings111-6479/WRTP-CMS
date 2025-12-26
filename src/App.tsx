@@ -14,6 +14,7 @@ import SignUpPage from './pages/SignUpPage';
 import PendingApprovalPage from './pages/PendingApprovalPage';
 import UsersPage from './pages/UsersPage';
 import ToDoPage from './pages/ToDoPage';
+import GrantReportPage from './pages/GrantReportPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -109,6 +110,14 @@ function App() {
             element={
               <AdminRoute>
                 <Layout><DataImportPage /></Layout>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/grant-report"
+            element={
+              <AdminRoute>
+                <Layout><GrantReportPage /></Layout>
               </AdminRoute>
             }
           />

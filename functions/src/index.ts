@@ -15,3 +15,4 @@ import { setGlobalOptions } from "firebase-functions";
 setGlobalOptions({ maxInstances: 10 });
 
 export * from "./ocr";
+export * from "./summary";

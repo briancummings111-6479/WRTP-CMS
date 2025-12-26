@@ -14,7 +14,8 @@ import {
   where,
   orderBy,
   onSnapshot,
-  Firestore
+  Firestore,
+  documentId
 } from "firebase/firestore";
 import {
   getAuth,
@@ -674,6 +675,74 @@ const api = {
       reader.onerror = error => reject(error);
       reader.readAsDataURL(file);
     });
+  },
+
+  // --- Summary Function ---
+  generateClientProgressSummary: async (clientId: string, timeRangeDays: number = 30, startDate?: string, endDate?: string): Promise<{ summary: string, caseNoteCount?: number, workshopCount?: number }> => {
+    const fn = httpsCallable(functions, 'generateClientProgressSummary');
+    const result = await fn({ clientId, timeRangeDays, startDate, endDate });
+    return result.data as { summary: string, caseNoteCount?: number, workshopCount?: number };
+  },
+
+  // --- Grant Report Helpers ---
+  getActiveClientsForRange: async (startDate: Date, endDate: Date): Promise<Client[]> => {
+    const startTimestamp = startDate.getTime();
+    const endTimestamp = endDate.getTime();
+    const activeClientIds = new Set<string>();
+
+    // 1. Check Case Notes
+    const notesQuery = query(
+      collection(db, "caseNotes"),
+      where("noteDate", ">=", startTimestamp),
+      where("noteDate", "<=", endTimestamp)
+    );
+    const notesSnap = await getDocs(notesQuery);
+    notesSnap.forEach(doc => activeClientIds.add(doc.data().clientId));
+
+    // 2. Check Workshops
+    const workshopsQuery = query(
+      collection(db, "workshops"),
+      where("workshopDate", ">=", startTimestamp),
+      where("workshopDate", "<=", endTimestamp)
+    );
+    const workshopsSnap = await getDocs(workshopsQuery);
+    workshopsSnap.forEach(doc => {
+      if (doc.data().status === 'Completed') {
+        activeClientIds.add(doc.data().clientId);
+      }
+    });
+
+    if (activeClientIds.size === 0) return [];
+
+    // 3. Fetch Client Details involved
+    // Firestore 'in' query supports max 10 items. We must batch.
+    const allIds = Array.from(activeClientIds);
+    const clientPromises = [];
+
+    // Simple approach: Fetch all clients and filter in memory? 
+    // Or fetch individually if list is large?
+    // Given the constraints and "Grant Admin" usage, fetching all clients is cached and fast enough usually.
+    // But let's do individual fetches or Batched 'in' queries. 
+    // Let's implement batching 10 at a time.
+
+    const BATCH_SIZE = 10;
+    const activeClients: Client[] = [];
+
+    for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+      const batchIds = allIds.slice(i, i + BATCH_SIZE);
+      const q = query(collection(db, "clients"), where(documentId(), "in", batchIds));
+      const snap = await getDocs(q);
+      snap.forEach(doc => activeClients.push({ id: doc.id, ...doc.data() } as Client));
+    }
+
+    // Sort by name
+    activeClients.sort((a, b) => {
+      const nameA = (a.profile?.firstName + a.profile?.lastName).toLowerCase();
+      const nameB = (b.profile?.firstName + b.profile?.lastName).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return activeClients;
   },
 
   // --- Notification Functions ---

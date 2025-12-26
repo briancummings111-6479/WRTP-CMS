@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/firebase';
 import { Client, ISP, AuditChecklist, AuditChecklistItem, User as AppUser, CaseNote, Workshop, ClientAttachment } from '../types';
 import Card from '../components/Card';
-import { User, Phone, Mail, Home, Edit, Link, Check, X, Save, Printer } from 'lucide-react';
+import { User, Phone, Mail, Home, Edit, Link, Check, X, Save, Printer, FileText } from 'lucide-react';
 import EditClientModal from '../components/EditClientModal';
 import { useAuth } from '../context/AuthContext';
 import CaseNotesSection from '../components/CaseNotes/CaseNotesSection';
@@ -13,6 +13,7 @@ import AttachmentsSection from '../components/Attachments/AttachmentsSection';
 import TasksSection from '../components/Tasks/TasksSection';
 import EnrollmentIntakeSection from '../components/EnrollmentIntakeSection';
 import WorkshopsSection from '../components/Workshops/WorkshopsSection';
+import ProgressSummaryModal from '../components/ProgressSummaryModal';
 
 // --- ADDED THIS HELPER TYPE ---
 // This creates a type that only includes the keys from Client['training'] that are booleans
@@ -159,6 +160,10 @@ const ClientDashboardPage: React.FC = () => {
   const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
   const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
+
+  // State for Progress Summary Modal
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const { user } = useAuth();
 
   // State for the Training Form
   const [isEditingTraining, setIsEditingTraining] = useState(false);
@@ -508,8 +513,25 @@ const ClientDashboardPage: React.FC = () => {
           <div className="flex items-center gap-2">
             {client.metadata.status !== 'Prospect' && <ClientTypeBadge clientType={metadata.clientType} />}
             <StatusBadge status={metadata.status} />
+            {user?.title === 'Administrator' && (
+              <button
+                onClick={() => setIsSummaryModalOpen(true)}
+                className="inline-flex items-center px-3 py-1.5 border border-[#404E3B] rounded-md shadow-sm text-sm font-medium text-[#404E3B] bg-white hover:bg-gray-50"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Generate Summary
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Progress Summary Modal */}
+        <ProgressSummaryModal
+          isOpen={isSummaryModalOpen}
+          onClose={() => setIsSummaryModalOpen(false)}
+          clientId={client.id}
+          clientName={`${profile.firstName} ${profile.lastName}`}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
