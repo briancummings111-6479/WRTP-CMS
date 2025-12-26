@@ -7,6 +7,7 @@ import Card from '../components/Card';
 import TaskItem from '../components/Tasks/TaskItem';
 import AddEditTaskModal from '../components/Tasks/AddEditTaskModal';
 import { Bell, X, Plus } from 'lucide-react';
+import TaskBoard from '../components/Tasks/TaskBoard';
 
 const ToDoPage: React.FC = () => {
     const { user } = useAuth();
@@ -148,6 +149,22 @@ const ToDoPage: React.FC = () => {
         setIsEditModalOpen(true);
     };
 
+    const handleStatusChange = async (task: Task, newStatus: Task['status']) => {
+        try {
+            const updatedTask = { ...task, status: newStatus };
+            // Optimistic update
+            setTasks(prev => prev.map(t => t.id === task.id ? updatedTask : t));
+
+            // API update
+            // upsertTask requires clientId, assume empty string if missing as per discussion
+            await api.upsertTask({ ...updatedTask, clientId: updatedTask.clientId || "" });
+        } catch (error) {
+            console.error("Failed to update status", error);
+            // Revert on failure
+            setTasks(prev => prev.map(t => t.id === task.id ? task : t));
+        }
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
@@ -244,34 +261,50 @@ const ToDoPage: React.FC = () => {
                     </Card>
 
                     {/* Task List */}
-                    <Card title="My Tasks">
-                        <div className={`p-4 ${user?.title === 'Administrator' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
-                            {loading ? (
-                                <div className="text-center py-4 text-gray-500 col-span-full">Loading tasks...</div>
-                            ) : filteredTasks.length > 0 ? (
-                                filteredTasks.map(task => (
-                                    <div
-                                        key={task.id}
-                                        onClick={() => task.clientId && navigate(`/clients/${task.clientId}`)}
-                                        className={`cursor-pointer group h-full ${!task.clientId ? 'cursor-default' : ''}`}
-                                    >
-                                        <div className="relative h-full">
-                                            <TaskItem
-                                                task={task}
-                                                onEdit={handleEditTask}
-                                                onDelete={handleDeleteTask}
-                                                hasNotification={notifications.some(n => n.relatedItemId === task.id)}
-                                            />
+                    {user?.title === 'Administrator' ? (
+                        <TaskBoard
+                            tasks={filteredTasks}
+                            onStatusChange={handleStatusChange}
+                            onTaskClick={(task) => {
+                                if (task.clientId) {
+                                    navigate(`/clients/${task.clientId}`);
+                                } else {
+                                    handleEditTask(task);
+                                }
+                            }}
+                            onEdit={handleEditTask}
+                            onDelete={handleDeleteTask}
+                        />
+                    ) : (
+                        <Card title="My Tasks">
+                            <div className={`p-4 ${user?.title === 'Administrator' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}`}>
+                                {loading ? (
+                                    <div className="text-center py-4 text-gray-500 col-span-full">Loading tasks...</div>
+                                ) : filteredTasks.length > 0 ? (
+                                    filteredTasks.map(task => (
+                                        <div
+                                            key={task.id}
+                                            onClick={() => task.clientId && navigate(`/clients/${task.clientId}`)}
+                                            className={`cursor-pointer group h-full ${!task.clientId ? 'cursor-default' : ''}`}
+                                        >
+                                            <div className="relative h-full">
+                                                <TaskItem
+                                                    task={task}
+                                                    onEdit={handleEditTask}
+                                                    onDelete={handleDeleteTask}
+                                                    hasNotification={notifications.some(n => n.relatedItemId === task.id)}
+                                                />
+                                            </div>
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-gray-500 col-span-full">
+                                        No tasks match your filters.
                                     </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-8 text-gray-500 col-span-full">
-                                    No tasks match your filters.
-                                </div>
-                            )}
-                        </div>
-                    </Card>
+                                )}
+                            </div>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Right Column: 1/3 - Notifications (Hidden for Admin) */}

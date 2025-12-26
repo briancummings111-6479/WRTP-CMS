@@ -14,6 +14,7 @@ import TasksSection from '../components/Tasks/TasksSection';
 import EnrollmentIntakeSection from '../components/EnrollmentIntakeSection';
 import WorkshopsSection from '../components/Workshops/WorkshopsSection';
 import ProgressSummaryModal from '../components/ProgressSummaryModal';
+import CaseNotesAnalysisSection from '../components/Dashboard/CaseNotesAnalysisSection';
 
 // --- ADDED THIS HELPER TYPE ---
 // This creates a type that only includes the keys from Client['training'] that are booleans
@@ -590,6 +591,8 @@ const ClientDashboardPage: React.FC = () => {
               clientName={`${profile.firstName} ${profile.lastName}`}
               admins={staff.map(s => ({ id: s.uid, name: s.name }))}
             />
+
+            <CaseNotesAnalysisSection clientId={client.id} />
           </div>
 
           {/* Right Column - Main Content */}

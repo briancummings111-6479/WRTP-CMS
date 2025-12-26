@@ -24,6 +24,7 @@ const HomePage: React.FC = () => {
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [clientTypeFilter, setClientTypeFilter] = useState('All Types');
   const [caseManagerFilter, setCaseManagerFilter] = useState('All Case Managers');
   const [daysSinceNoteFilter, setDaysSinceNoteFilter] = useState('');
 
@@ -74,7 +75,7 @@ const HomePage: React.FC = () => {
         client.metadata.assignedAdminName.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === 'All Statuses' || client.metadata.status === statusFilter;
-
+      const matchesClientType = clientTypeFilter === 'All Types' || client.metadata.clientType === clientTypeFilter;
       const matchesManager = caseManagerFilter === 'All Case Managers' || client.metadata.assignedAdminId === caseManagerFilter;
 
       let matchesDaysSinceNote = true;
@@ -92,9 +93,9 @@ const HomePage: React.FC = () => {
         }
       }
 
-      return matchesSearch && matchesStatus && matchesManager && matchesDaysSinceNote;
+      return matchesSearch && matchesStatus && matchesClientType && matchesManager && matchesDaysSinceNote;
     });
-  }, [clients, searchTerm, statusFilter, caseManagerFilter, daysSinceNoteFilter]);
+  }, [clients, searchTerm, statusFilter, clientTypeFilter, caseManagerFilter, daysSinceNoteFilter]);
 
   return (
     <>
@@ -141,6 +142,15 @@ const HomePage: React.FC = () => {
                     <option value="Inactive">Inactive</option>
                   </select>
                   <select
+                    value={clientTypeFilter}
+                    onChange={(e) => setClientTypeFilter(e.target.value)}
+                    className="block w-full sm:w-1/3 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
+                  >
+                    <option value="All Types">All Types</option>
+                    <option value="General Population">General Population</option>
+                    <option value="CHYBA">CHYBA Students</option>
+                  </select>
+                  <select
                     value={caseManagerFilter}
                     onChange={(e) => setCaseManagerFilter(e.target.value)}
                     className="block w-full sm:w-1/3 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
@@ -161,12 +171,13 @@ const HomePage: React.FC = () => {
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Case Manager</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Type</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Added</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Most Recent Case Note</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                       <th scope="col" className="relative px-6 py-3"><span className="sr-only">View</span></th>
@@ -185,6 +196,9 @@ const HomePage: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.metadata.clientType}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <ClientStatusBadge status={client.metadata.status} />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {client.metadata.dateApplication ? new Date(client.metadata.dateApplication).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {client.metadata.lastCaseNoteDate ? new Date(client.metadata.lastCaseNoteDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}

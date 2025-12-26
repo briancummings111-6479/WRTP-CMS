@@ -652,6 +652,22 @@ const api = {
     }
   },
 
+  // --- AI Analysis Functions ---
+  getClientSummary: async (clientId: string): Promise<{ servicesProvided: string[], progressToGoals: string, lastUpdated?: any } | null> => {
+    const docRef = doc(db, "clientSummaries", clientId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as { servicesProvided: string[], progressToGoals: string, lastUpdated?: any };
+    }
+    return null;
+  },
+
+  analyzeClientProgress: async (clientId: string): Promise<{ servicesProvided: string[], progressToGoals: string }> => {
+    const analyzeFn = httpsCallable<{ clientId: string }, { servicesProvided: string[], progressToGoals: string }>(functions, 'analyzeClientProgress');
+    const result = await analyzeFn({ clientId });
+    return result.data;
+  },
+
   // --- OCR Functions ---
   extractFormData: async (file: File, formType: 'Intake' | 'ISP'): Promise<any> => {
     // Convert file to Base64
