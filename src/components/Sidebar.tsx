@@ -14,7 +14,7 @@ const adminNavItems: { to: string; text: string; icon: React.ElementType }[] = [
   { to: '/export', text: 'Data Export', icon: Download },
 
   { to: '/import', text: 'Data Import', icon: Upload },
-  { to: '/grant-report', text: 'Grant Reports', icon: FileBarChart },
+
 ];
 
 // FIX: Use React.FC to correctly type the component, which allows React's special 'key' prop to be used without TypeScript errors.
