@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/firebase';
-import { Client, Workshop } from '../types';
+import { Client, Workshop, CaseNote } from '../types';
 import Card from '../components/Card';
 import { Printer } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
     const statusStyles: { [key in Workshop['status']]: string } = {
@@ -12,6 +13,8 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
         Completed: 'bg-green-100 text-green-800',
         Declined: 'bg-yellow-100 text-yellow-800',
         'No Show': 'bg-red-100 text-red-800',
+        'On Hold': 'bg-gray-100 text-gray-800',
+        Canceled: 'bg-gray-100 text-gray-800',
     };
     return (
         <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`}>
@@ -23,23 +26,27 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
 const ReportsPage: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [workshops, setWorkshops] = useState<Workshop[]>([]);
+    const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
     const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [workshopFilter, setWorkshopFilter] = useState('All');
     const [selectedCaseManager, setSelectedCaseManager] = useState('All');
     const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
+    const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>('All');
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [clientsData, workshopsData, usersData] = await Promise.all([
+                const [clientsData, workshopsData, usersData, caseNotesData] = await Promise.all([
                     api.getClients(),
                     api.getAllWorkshops(),
-                    api.getStaffUsers()
+                    api.getStaffUsers(),
+                    api.getAllCaseNotes()
                 ]);
                 setClients(clientsData);
                 setWorkshops(workshopsData);
+                setCaseNotes(caseNotesData);
 
                 // Filter users to only those with "Case Manager" in their title
                 const staffUsers = usersData
@@ -61,6 +68,90 @@ const ReportsPage: React.FC = () => {
         if (selectedCaseManager === 'All') return clients;
         return clients.filter(c => c.metadata.assignedAdminId === selectedCaseManager);
     }, [clients, selectedCaseManager]);
+
+    const encountersReportData = useMemo(() => {
+        const filterByStaff = (id: string) => {
+            if (selectedCaseManager === 'All') return true;
+            return id === selectedCaseManager;
+        }
+
+        const filteredCaseNotes = caseNotes.filter(n => filterByStaff(n.staffId));
+        const filteredWorkshops = workshops.filter(w => filterByStaff(w.assignedToId));
+
+        // 1. Generate Graph Data (Month to Month)
+        const monthlyStats = new Map<string, { month: string, caseNotes: number, contactNotes: number, workshops: number }>();
+
+        const processDate = (timestamp: number, type: 'Case Note' | 'Contact Note' | 'Workshop') => {
+            const date = new Date(timestamp);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+
+            if (!monthlyStats.has(monthKey)) {
+                monthlyStats.set(monthKey, { month: monthKey, caseNotes: 0, contactNotes: 0, workshops: 0 });
+            }
+            const stats = monthlyStats.get(monthKey)!;
+            if (type === 'Case Note') stats.caseNotes++;
+            else if (type === 'Contact Note') stats.contactNotes++;
+            else if (type === 'Workshop') stats.workshops++;
+        };
+
+        filteredCaseNotes.forEach(n => {
+            if (n.noteType === 'Case Note') processDate(n.noteDate, 'Case Note');
+            else if (n.noteType === 'Contact Note') processDate(n.noteDate, 'Contact Note');
+        });
+
+        filteredWorkshops.forEach(w => {
+            if (w.status === 'Completed' || w.status === 'In Progress') {
+                processDate(w.workshopDate, 'Workshop');
+            }
+        });
+
+        // Convert to array and sort chronological
+        const graphData = Array.from(monthlyStats.values()).sort((a, b) => a.month.localeCompare(b.month));
+
+        // Format for display
+        const formattedGraphData = graphData.map(d => {
+            const [y, m] = d.month.split('-');
+            const date = new Date(parseInt(y), parseInt(m) - 1);
+            return {
+                ...d,
+                name: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                fullMonthName: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+            };
+        });
+
+        // 2. Calculate Totals based on Filter
+        let totalStats = {
+            totalEncounters: 0,
+            caseNotesCount: 0,
+            contactNotesCount: 0,
+            workshopsCount: 0
+        };
+
+        if (encountersMonthFilter === 'All') {
+            formattedGraphData.forEach(d => {
+                totalStats.caseNotesCount += d.caseNotes;
+                totalStats.contactNotesCount += d.contactNotes;
+                totalStats.workshopsCount += d.workshops;
+            });
+        } else {
+            const monthData = formattedGraphData.find(d => d.month === encountersMonthFilter);
+            if (monthData) {
+                totalStats.caseNotesCount = monthData.caseNotes;
+                totalStats.contactNotesCount = monthData.contactNotes;
+                totalStats.workshopsCount = monthData.workshops;
+            }
+        }
+        totalStats.totalEncounters = totalStats.caseNotesCount + totalStats.contactNotesCount + totalStats.workshopsCount;
+
+        // Available Months for Dropdown (descending)
+        const availableMonths = formattedGraphData.map(d => ({ value: d.month, label: d.fullMonthName })).sort((a, b) => b.value.localeCompare(a.value));
+
+        return {
+            stats: totalStats,
+            graphData: formattedGraphData,
+            availableMonths
+        };
+    }, [caseNotes, workshops, encountersMonthFilter, selectedCaseManager]);
 
     const reportData = useMemo(() => {
         const totalIndividuals = filteredClients.length;
@@ -113,8 +204,8 @@ const ReportsPage: React.FC = () => {
     }, [filteredClients]);
 
     const workshopMatrixData = useMemo(() => {
-        const allWorkshopNames = Array.from(new Set(workshops.map(w =>
-            w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName
+        const allWorkshopNames = Array.from<string>(new Set(workshops.map(w =>
+            (w.workshopName === 'Other' && w.workshopNameOther ? w.workshopNameOther : w.workshopName) as string
         ))).sort((a, b) => {
             const predefinedOrder = [
                 'Career Explorations',
@@ -214,14 +305,70 @@ const ReportsPage: React.FC = () => {
             grouped[key].sort((a, b) => a.clientName.localeCompare(b.clientName));
         }
 
+
         const workshopNames = Object.keys(grouped).sort();
 
         return { groupedWorkshops: grouped, workshopNames };
     }, [filteredClients, workshops]);
 
+
+    const barriersReportData = useMemo(() => {
+        // Filter for ACTIVE clients only
+        const activeClients = filteredClients.filter(c => c.metadata.status === 'Active');
+
+        const barriersList = [
+            { key: 'transportation', label: 'Transportation' },
+            { key: 'substanceUseRecovery', label: 'Substance Use Recovery' },
+            { key: 'stateIdDriversLicense', label: 'State Id Drivers License' },
+            { key: 'mentalHealthChallenges', label: 'Mental Health Challenges' },
+            { key: 'housingInstability', label: 'Housing Instability' },
+            { key: 'disability', label: 'Disability' },
+            { key: 'criminalRecord', label: 'Criminal Record' },
+            { key: 'socialSecurityCard', label: 'Social Security Card' },
+            { key: 'other', label: 'Other' },
+        ];
+
+        const data = barriersList.map(barrier => {
+            let genPopCount = 0;
+            let chybaCount = 0;
+
+            activeClients.forEach(client => {
+                const barriers = client.demographics?.barriersToEmployment;
+                if (barriers) {
+                    // check if the barrier is present (true for boolean, non-empty for string 'other')
+                    const isPresent = barrier.key === 'other'
+                        ? !!barriers.other
+                        : (barriers as any)[barrier.key] === true;
+
+                    if (isPresent) {
+                        if (client.metadata.clientType === 'General Population') {
+                            genPopCount++;
+                        } else if (client.metadata.clientType === 'CHYBA') {
+                            chybaCount++;
+                        }
+                    }
+                }
+            });
+
+            const totalGenPop = activeClients.filter(c => c.metadata.clientType === 'General Population').length;
+            const totalChyba = activeClients.filter(c => c.metadata.clientType === 'CHYBA').length;
+
+            return {
+                name: barrier.label,
+                genPopCount,
+                chybaCount,
+                genPopPercentage: totalGenPop > 0 ? (genPopCount / totalGenPop) * 100 : 0,
+                chybaPercentage: totalChyba > 0 ? (chybaCount / totalChyba) * 100 : 0
+            };
+        });
+
+        return { data, totalActive: activeClients.length };
+    }, [filteredClients]);
+
+
     const generateClientReportHTML = () => {
         const caseManagerName = selectedCaseManager === 'All'
-            ? 'All Case Managers'
+            ? 'All Staff'
             : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
 
         return `
@@ -239,7 +386,7 @@ const ReportsPage: React.FC = () => {
                     <h1 class="text-3xl font-bold text-gray-900">Client Population Report</h1>
                     <div class="mt-2 flex justify-between text-gray-600">
                         <p>Generated on: ${new Date().toLocaleDateString()}</p>
-                        <p>Case Manager: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
+                        <p>WRTP Staff: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
                     </div>
                 </header>
                 
@@ -321,8 +468,78 @@ const ReportsPage: React.FC = () => {
         `;
     };
 
+    const generateBarriersReportHTML = () => {
+        const caseManagerName = selectedCaseManager === 'All'
+            ? 'All Staff'
+            : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
+
+        const rows = barriersReportData.data.map(d => `
+            <tr class="bg-white border-b">
+                <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${d.name}</td>
+                <td class="px-6 py-4 text-center">
+                    <span class="font-semibold text-gray-900">${d.genPopCount}</span>
+                    <span class="text-sm text-gray-500 ml-1">(${d.genPopPercentage.toFixed(1)}%)</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <span class="font-semibold text-gray-900">${d.chybaCount}</span>
+                    <span class="text-sm text-gray-500 ml-1">(${d.chybaPercentage.toFixed(1)}%)</span>
+                </td>
+            </tr>
+        `).join('');
+
+        return `
+            <html>
+            <head>
+                <title>Barriers to Employment Report</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                 <style>
+                    body { font-family: sans-serif; }
+                    .break-inside-avoid { page-break-inside: avoid; }
+                </style>
+            </head>
+             <body class="p-8 bg-white">
+                <header class="mb-8 border-b pb-4">
+                    <h1 class="text-3xl font-bold text-gray-900">Barriers to Employment Report</h1>
+                    <div class="mt-2 flex justify-between text-gray-600">
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                        <p>WRTP Staff: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
+                    </div>
+                     <p className="mt-1 text-sm text-gray-500">Based on ${barriersReportData.totalActive} Active Clients</p>
+                </header>
+                <main>
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">Barrier</th>
+                                <th scope="col" class="px-6 py-3 text-center">General Population</th>
+                                <th scope="col" class="px-6 py-3 text-center">CHYBA Students</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </main>
+            </body>
+            </html>
+        `;
+    };
+
     const handlePrintClientReport = () => {
         const printContent = generateClientReportHTML();
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+    };
+
+    const handlePrintBarriersReport = () => {
+        const printContent = generateBarriersReportHTML();
         const printWindow = window.open('', '_blank');
         if (printWindow) {
             printWindow.document.write(printContent);
@@ -342,6 +559,8 @@ const ReportsPage: React.FC = () => {
                 Completed: 'bg-green-100 text-green-800',
                 Declined: 'bg-yellow-100 text-yellow-800',
                 'No Show': 'bg-red-100 text-red-800',
+                'On Hold': 'bg-gray-100 text-gray-800',
+                Canceled: 'bg-gray-100 text-gray-800',
             };
             const classes = `px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusStyles[status]}`;
             return `<span class="${classes}">${status}</span>`;
@@ -384,7 +603,7 @@ const ReportsPage: React.FC = () => {
             : '';
 
         const caseManagerName = selectedCaseManager === 'All'
-            ? 'All Case Managers'
+            ? 'All Staff'
             : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
 
         return `
@@ -401,7 +620,7 @@ const ReportsPage: React.FC = () => {
                 <header class="mb-6">
                     <h1 class="text-2xl font-bold">Workshop Attendance Report</h1>
                     <p class="text-gray-600">Generated on: ${new Date().toLocaleDateString()}</p>
-                    <p class="text-gray-600">Case Manager: ${caseManagerName}</p>
+                    <p class="text-gray-600">WRTP Staff: ${caseManagerName}</p>
                     ${workshopFilter !== 'All' ? `<p class="text-gray-600">Filter: ${workshopFilter}</p>` : ''}
                 </header>
                 <main class="space-y-8">
@@ -441,20 +660,22 @@ const ReportsPage: React.FC = () => {
             <div className="flex justify-between items-center no-print">
                 <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
                 <div className="flex items-center space-x-2">
-                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">Case Manager:</label>
+                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">WRTP Staff:</label>
                     <select
                         id="caseManagerFilter"
                         value={selectedCaseManager}
                         onChange={(e) => setSelectedCaseManager(e.target.value)}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
                     >
-                        <option value="All">All Case Managers</option>
+                        <option value="All">All Staff</option>
                         {admins.map(admin => (
                             <option key={admin.id} value={admin.id}>{admin.name}</option>
                         ))}
                     </select>
                 </div>
             </div>
+
+
 
             <Card
                 title="Client Population Report"
@@ -475,11 +696,11 @@ const ReportsPage: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span className="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
+                            <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span class="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span className="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
+                            <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span class="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
@@ -513,6 +734,144 @@ const ReportsPage: React.FC = () => {
                     ) : (
                         <p className="text-center text-gray-500 py-6">No enrolled clients to analyze.</p>
                     )}
+                </div>
+            </Card>
+
+            <Card
+                title="Encounters Report"
+                className="no-print"
+                titleAction={
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
+                        <select
+                            id="encountersMonthFilter"
+                            value={encountersMonthFilter}
+                            onChange={(e) => setEncountersMonthFilter(e.target.value)}
+                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                        >
+                            <option value="All">All Months</option>
+                            {encountersReportData.availableMonths.map(m => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                }
+            >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-8">
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.totalEncounters}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.caseNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.contactNotesCount}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops Delivered</p>
+                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.workshopsCount}</p>
+                    </div>
+                </div>
+
+                <div className="h-[400px] w-full mt-8">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Encounters Trend</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                            data={encountersReportData.graphData}
+                            margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 30,
+                            }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip
+                                cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                            />
+                            <Legend />
+                            <Bar dataKey="caseNotes" name="Case Notes" stackId="a" fill="#4D7C7B" />
+                            <Bar dataKey="workshops" name="Workshops Delivered" stackId="a" fill="#9CB072" />
+                            <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#6B7280" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </Card>
+
+            {/* Barriers to Employment Report */}
+            <Card
+                title="Barriers to Employment"
+                className="no-print"
+                titleAction={
+                    <button
+                        onClick={handlePrintBarriersReport}
+                        className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Report
+                    </button>
+                }
+            >
+                <div className="mb-4">
+                    <p className="text-sm text-gray-500">Analysis based on <span className="font-semibold text-gray-700">{barriersReportData.totalActive} Active</span> clients.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Chart Area */}
+                    <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                layout="vertical"
+                                data={barriersReportData.data}
+                                margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" unit="%" />
+                                <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    formatter={(value: number) => [`${value.toFixed(1)}%`, 'Percentage']}
+                                />
+                                <Legend />
+                                <Bar dataKey="genPopPercentage" name="Gen Pop %" fill="#4D7C7B" />
+                                <Bar dataKey="chybaPercentage" name="CHYBA %" fill="#E6A532" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Table Area */}
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th scope="col" className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Barrier</th>
+                                    <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Gen Pop</th>
+                                    <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">CHYBA</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {barriersReportData.data.map((barrier) => (
+                                    <tr key={barrier.name}>
+                                        <td className="px-3 py-2 font-medium text-gray-900">{barrier.name}</td>
+                                        <td className="px-3 py-2 text-center">
+                                            <div className="text-gray-900 font-semibold">{barrier.genPopCount}</div>
+                                            <div className="text-xs text-gray-500">{barrier.genPopPercentage.toFixed(1)}%</div>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                            <div className="text-gray-900 font-semibold">{barrier.chybaCount}</div>
+                                            <div className="text-xs text-gray-500">{barrier.chybaPercentage.toFixed(1)}%</div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </Card>
 

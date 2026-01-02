@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Card from '../components/Card';
-import { UploadCloud, Download, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { UploadCloud, Download, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import api from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Client, AuditChecklist } from '../types';
@@ -41,37 +41,17 @@ const CSV_HEADERS = [
 ];
 
 // --- NEW Initial data for Audit Checklist ---
-const initialAuditChecklist: AuditChecklist = {
-    onboarding: [
-        { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    isp: [
-        { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    caseNotes: [
-        { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    workshops: [
-        { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    misc: []
-};
+const initialAuditChecklist: AuditChecklist = [
+    { id: "1.1", label: "1.1 WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.2", label: "1.2 Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.3", label: "1.3 Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.5", label: "1.5 Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.6", label: "1.6 WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.9", label: "1.9 Authorization of Release", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.1", label: "2.1 Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.2", label: "2.2 Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "referrals", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" },
+];
 
 const DataImportPage: React.FC = () => {
     const { user } = useAuth();
@@ -514,13 +494,75 @@ const DataImportPage: React.FC = () => {
 
 
 
-            <Card title="Data Cleanup (Fix Duplicates)">
+            <Card title="Administrative Tools">
                 <div className="space-y-4">
-                    <p className="text-gray-600">
-                        Use this tool to identify and remove duplicate client records created during import.
-                        It finds clients with the same First and Last Name and keeps only the oldest record.
-                    </p>
-                    <div className="flex space-x-4">
+                    <div className="flex flex-col space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Data Synchronization</h4>
+                        <p className="text-sm text-gray-500">
+                            Sync "Most Recent Case Note" dates for all clients. Run this once to populate historical data.
+                        </p>
+                        <div>
+                            <button
+                                onClick={async () => {
+                                    if (confirm("This will scan all clients and recount their most recent case note date. Continue?")) {
+                                        setIsParsing(true);
+                                        try {
+                                            const count = await api.syncAllClientsLastCaseNoteDate();
+                                            alert(`Successfully synced ${count} clients.`);
+                                        } catch (error) {
+                                            alert("Sync failed: " + error);
+                                        } finally {
+                                            setIsParsing(false);
+                                        }
+                                    }
+                                }}
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Sync Case Note Dates
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Backup & Export</h4>
+                        <p className="text-sm text-gray-500 mb-3">
+                            Download a full JSON backup of all database content (Clients, Notes, Tasks, etc.).
+                        </p>
+                        <button
+                            onClick={async () => {
+                                setIsParsing(true);
+                                try {
+                                    const backupData = await api.createBackup();
+                                    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `wrtp_backup_${new Date().toISOString().split('T')[0]}.json`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    alert("Backup downloaded successfully.");
+                                } catch (error) {
+                                    console.error(error);
+                                    alert("Backup failed: " + error);
+                                } finally {
+                                    setIsParsing(false);
+                                }
+                            }}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Full Backup
+                        </button>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Data Cleanup</h4>
+                        <p className="text-sm text-gray-500 mb-3">
+                            Identify and remove duplicate client records (same First + Last Name). Keeps the oldest record.
+                        </p>
                         <button
                             onClick={async () => {
                                 setIsParsing(true);
@@ -568,14 +610,14 @@ const DataImportPage: React.FC = () => {
                                     setIsParsing(false);
                                 }
                             }}
-                            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                         >
                             Scan & Remove Duplicates
                         </button>
                     </div>
                 </div>
             </Card>
-        </div >
+        </div>
     );
 };
 

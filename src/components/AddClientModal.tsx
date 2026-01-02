@@ -12,39 +12,17 @@ interface AddClientModalProps {
 }
 
 // --- NEW Initial data for Audit Checklist ---
-const initialAuditChecklist: AuditChecklist = {
-    onboarding: [
-        { id: "1.1", label: "WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.2", label: "Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.3", label: "Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.4", label: "Proof of Residency", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.5", label: "Income Verification", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.6", label: "WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "1.9", label: "Authorization of Release", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    isp: [
-        { id: "2.1", label: "Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.2", label: "Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.3", label: "Goals Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.4", label: "Barriers Identified", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "2.5", label: "Action Plan", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    caseNotes: [
-        { id: "3.1", label: "Initial Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.2", label: "Ongoing Case Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.3", label: "Participant Check-Ins", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "3.4", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    workshops: [
-        { id: "4.1", label: "Workshop Attendance Records/Notes", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.2", label: "Job Readiness Assessments (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.3", label: "Aptitude Test(s)", present: false, complete: false, uploaded: false, notes: "" },
-        { id: "4.4", label: "Certificates of Completion", present: false, complete: false, uploaded: false, notes: "" }
-    ],
-    misc: [
-        // Per the CSV, this section is empty
-    ]
-};
+const initialAuditChecklist: AuditChecklist = [
+    { id: "1.1", label: "1.1 WRTP Contact Form", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.2", label: "1.2 Completed WRTP Application", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.3", label: "1.3 Proof of Identity (e.g., ID, DL)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.5", label: "1.5 Income Verification", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.6", label: "1.6 WRTP Assessment", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "1.9", label: "1.9 Authorization of Release", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.1", label: "2.1 Initial ISP Completed & Signed", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "2.2", label: "2.2 Updated ISP (if applicable)", present: false, complete: false, uploaded: false, notes: "" },
+    { id: "referrals", label: "Referrals & Services Provided", present: false, complete: false, uploaded: false, notes: "" },
+];
 // ----------------------------------------
 
 const initialFormData = {
@@ -91,6 +69,7 @@ const initialFormData = {
         assignedAdminName: '',
         clientType: 'General Population' as Client['metadata']['clientType'],
         status: 'Prospect' as Client['metadata']['status'],
+        dateApplication: new Date().toISOString().split('T')[0], // Default to today
     },
 };
 
@@ -167,7 +146,15 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         if (!user) return;
         setIsSaving(true);
         try {
-            const newClient = await api.addClient(formData, user.uid);
+            const submissionData = {
+                ...formData,
+                metadata: {
+                    ...formData.metadata,
+                    // Convert date string to timestamp for storage
+                    dateApplication: formData.metadata.dateApplication ? new Date(formData.metadata.dateApplication).getTime() : undefined,
+                }
+            };
+            const newClient = await api.addClient(submissionData, user.uid);
             onSave(newClient);
         } catch (error) {
             console.error("Failed to add client:", error);
@@ -222,7 +209,16 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                         <fieldset className="space-y-4 p-4 border border-[#d1d1d1] rounded-md">
                             <legend className="text-lg font-medium text-gray-700 px-1">Case Management</legend>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><label className="label">Client Status</label><select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input"><option value="Prospect">Prospect</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                                <div>
+                                    <label className="label">Client Status</label>
+                                    <select name="status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input">
+                                        <option value="Prospect">Prospect</option>
+                                        <option value="Applicant">Applicant</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                                <div><label className="label">Date Added</label><input type="date" name="dateApplication" value={formData.metadata.dateApplication} onChange={handleMetadataChange} className="form-input" /></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
                                 {/* Removed 'required' from Assigned Case Manager */}
                                 <div>

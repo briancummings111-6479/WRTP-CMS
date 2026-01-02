@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { CaseNote } from '../../types';
+import { CaseNote, ClientAttachment } from '../../types';
 import api from '../../lib/firebase';
 import { Bold, Italic, List } from 'lucide-react';
 import Card from '../Card';
@@ -30,8 +30,14 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     const [serviceType, setServiceType] = useState<CaseNote['serviceType']>('General Check-in');
     const [contactMethod, setContactMethod] = useState<CaseNote['contactMethod']>('Hartnell Office');
     const [durationMinutes, setDurationMinutes] = useState<number>(15);
-    const [attachments, setAttachments] = useState<{ fileName: string; storageUrl: string }[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [attachments, setAttachments] = useState<{ fileName: string; storageUrl: string }[]>([]); // Keep this for display/compat if needed, but we'll rebuild it
     const [submitting, setSubmitting] = useState(false);
+
+    // New state for Author dropdown
+    const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
+    const [selectedAuthorId, setSelectedAuthorId] = useState<string>('');
+
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,9 +49,31 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         setContactMethod('Hartnell Office');
         setDurationMinutes(15);
         setAttachments([]);
+        setSelectedFiles([]);
+        // Reset author to current user if available
+        if (user) setSelectedAuthorId(user.uid);
         if (editorRef.current) editorRef.current.innerHTML = '';
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
+
+    useEffect(() => {
+        const fetchStaff = async () => {
+            try {
+                const staff = await api.getStaffUsers();
+                setStaffMembers(staff.map(s => ({ uid: s.uid, name: s.name })));
+            } catch (error) {
+                console.error("Failed to fetch staff members", error);
+            }
+        };
+        fetchStaff();
+    }, []);
+
+    // Set default author when user loads
+    useEffect(() => {
+        if (user && !selectedAuthorId && !isEditing) {
+            setSelectedAuthorId(user.uid);
+        }
+    }, [user, selectedAuthorId, isEditing]);
 
     useEffect(() => {
         if (isEditing && noteToEdit) {
@@ -59,6 +87,10 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
             setContactMethod(noteToEdit.contactMethod);
             setDurationMinutes(noteToEdit.durationMinutes);
             setAttachments(noteToEdit.attachments || []);
+            // Set author from existing note
+            if (noteToEdit.staffId) {
+                setSelectedAuthorId(noteToEdit.staffId);
+            }
             if (editorRef.current) {
                 editorRef.current.innerHTML = noteToEdit.noteBody;
             }
@@ -79,13 +111,14 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            // FIX: Explicitly type `file` as `File` to resolve type inference issue.
-            const newFiles = Array.from(e.target.files).map((file: File) => ({
-                fileName: file.name,
-                storageUrl: `gs://chwrtp-files/caseNoteFiles/${clientId}/note_id_placeholder/${file.name}` // Mock URL
-            }));
-            setAttachments(prev => [...prev, ...newFiles]);
+            const files = Array.from(e.target.files);
+            setSelectedFiles(prev => [...prev, ...files]);
         }
+    };
+
+    // Remove file from selection
+    const removeFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -97,6 +130,44 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
 
         try {
             const timestamp = new Date(noteDate + 'T00:00:00').getTime();
+
+            // Find selected author details
+            const selectedAuthor = staffMembers.find(s => s.uid === selectedAuthorId) || { uid: user.uid, name: user.name };
+
+            // Handle File Uploads
+            const uploadedAttachments: { fileName: string; storageUrl: string }[] = [...attachments]; // Start with existing attachments if editing
+
+            for (const file of selectedFiles) {
+                try {
+                    // 1. Upload file
+                    const downloadUrl = await api.uploadClientFile(file, clientId);
+
+                    // 2. Create Attachment Metadata Record
+                    const newAttachment = {
+                        id: crypto.randomUUID(),
+                        clientId,
+                        fileName: file.name,
+                        fileType: file.type || 'Unknown',
+                        fileSize: file.size,
+                        storageUrl: downloadUrl,
+                        uploadedBy: user.name,
+                        uploadDate: Date.now(),
+                        category: 'Case Note' // Tag as Case Note attachment
+                    };
+                    await api.addAttachment(newAttachment);
+
+                    // 3. Add to note's attachment list
+                    uploadedAttachments.push({
+                        fileName: file.name,
+                        storageUrl: downloadUrl
+                    });
+
+                } catch (uploadError) {
+                    console.error(`Failed to upload file ${file.name}`, uploadError);
+                    alert(`Failed to upload ${file.name}. Note will be saved without this file.`);
+                }
+            }
+
             if (isEditing && noteToEdit) {
                 const updatedNote: CaseNote = {
                     ...noteToEdit,
@@ -106,17 +177,17 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     contactMethod,
                     durationMinutes,
                     noteBody,
-                    attachments,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    attachments: uploadedAttachments,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                 };
                 await api.updateCaseNote(updatedNote);
             } else {
                 const newNoteData = {
                     clientId,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                     noteType,
                     urgency,
@@ -124,7 +195,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     contactMethod,
                     durationMinutes,
                     noteBody,
-                    attachments,
+                    attachments: uploadedAttachments,
                 };
                 await api.addCaseNote(newNoteData);
             }
@@ -141,20 +212,29 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     return (
         <Card title={isEditing ? 'Edit Case Note' : 'Add New Case Note'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     {/* Note Date */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Note Date</label>
                         <input type="date" value={noteDate} onChange={e => setNoteDate(e.target.value)} className="form-input" required />
                     </div>
-                    {/* Note Type */}
+                    {/* Author */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Note Type</label>
-                        <select value={noteType} onChange={e => setNoteType(e.target.value as CaseNote['noteType'])} className="form-input">
-                            <option>Case Note</option>
-                            <option>Contact Note</option>
+                        <label className="block text-sm font-medium text-gray-700">Author</label>
+                        <select
+                            value={selectedAuthorId}
+                            onChange={e => setSelectedAuthorId(e.target.value)}
+                            className="form-input"
+                        >
+                            {staffMembers.map(member => (
+                                <option key={member.uid} value={member.uid}>
+                                    {member.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
+                    {/* Note Type - REMOVED */}
+
                     {/* Urgency */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Urgency</label>
@@ -178,7 +258,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </div>
                     {/* Contact Method */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Contact Method</label>
+                        <label className="block text-sm font-medium text-gray-700">Method</label>
                         <select value={contactMethod} onChange={e => setContactMethod(e.target.value as CaseNote['contactMethod'])} className="form-input">
                             <option>Hartnell Office</option>
                             <option>CHYBA Office</option>
@@ -221,11 +301,31 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </div>
                 </div>
 
-                {attachments.length > 0 && (
+                {/* Display Selected Files (Pending Upload) */}
+                {selectedFiles.length > 0 && (
                     <div className="text-sm text-gray-600">
-                        <p className="font-medium">Selected files:</p>
+                        <p className="font-medium">Files to upload:</p>
                         <ul className="list-disc list-inside">
-                            {attachments.map((file, i) => <li key={i}>{file.fileName}</li>)}
+                            {selectedFiles.map((file, i) => (
+                                <li key={i} className="flex justify-between items-center">
+                                    <span>{file.name}</span>
+                                    <button type="button" onClick={() => removeFile(i)} className="text-red-500 hover:text-red-700 text-xs ml-2">Remove</button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Display Existing Attachments (If modifying) */}
+                {attachments.length > 0 && (
+                    <div className="text-sm text-gray-600 mt-2">
+                        <p className="font-medium">Attached files:</p>
+                        <ul className="list-disc list-inside">
+                            {attachments.map((file, i) => (
+                                <li key={i}>
+                                    <a href={file.storageUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{file.fileName}</a>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 )}

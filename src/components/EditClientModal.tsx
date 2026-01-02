@@ -54,6 +54,9 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
       } else if (name.startsWith('metadata.')) {
         const field = name.split('.')[1];
         (newMetadata as any)[field] = value;
+      } else if (name === 'metadata.dateApplication') {
+        // Convert string date (YYYY-MM-DD) back to timestamp
+        (newMetadata as any).dateApplication = value ? new Date(value).getTime() : undefined;
       } else {
         (newMetadata as any)[name] = value;
       }
@@ -130,9 +133,21 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
                   <label className="label">Client Status</label>
                   <select name="metadata.status" value={formData.metadata.status} onChange={handleMetadataChange} className="form-input">
                     <option value="Prospect">Prospect</option>
+                    <option value="Applicant">Applicant</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
+                </div>
+                <div>
+                  <label className="label">Date Added</label>
+                  <input
+                    type="date"
+                    name="metadata.dateApplication"
+                    // Convert timestamp to YYYY-MM-DD string
+                    value={formData.metadata.dateApplication ? new Date(formData.metadata.dateApplication).toISOString().split('T')[0] : ''}
+                    onChange={handleMetadataChange}
+                    className="form-input"
+                  />
                 </div>
                 <div>
                   <label className="label">Client Type</label>
