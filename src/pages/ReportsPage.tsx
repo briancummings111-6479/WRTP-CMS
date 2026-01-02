@@ -48,9 +48,9 @@ const ReportsPage: React.FC = () => {
                 setWorkshops(workshopsData);
                 setCaseNotes(caseNotesData);
 
-                // Filter users to only those with "Case Manager" in their title
+                // Filter users to only those with "Case Manager" in their title - REMOVED per user request
                 const staffUsers = usersData
-                    .filter(u => u.title?.toLowerCase().includes('case manager'))
+                    //.filter(u => u.title?.toLowerCase().includes('case manager'))
                     .map(u => ({ id: u.uid, name: u.name }));
 
                 setAdmins(staffUsers);
