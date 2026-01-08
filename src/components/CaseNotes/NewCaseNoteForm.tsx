@@ -137,32 +137,61 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
             // --- Mention Logic Start ---
             const mentionedUserIds = new Set<string>();
 
-            // Simple regex to find @Name patterns (e.g., @Brian, @Brian Cummings)
-            // We'll replace them with bold tags and collect IDs to notify
-            // We iterate staff members to find matches in the text to avoid false positives or partial matches
+            // Helper to escape regex special characters
+            const escapeRegExp = (string: string) => {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            };
 
-            // Sort staff by name length desc to match full names before first names
-            const sortedStaff = [...staffMembers].sort((a, b) => b.name.length - a.name.length);
+            // 1. Build a list of matchable terms (Full Name and First Name)
+            // We verify that the name parts are valid (length > 1) to avoid matching single letters
+            let searchTerms: { term: string; staff: typeof staffMembers[0] }[] = [];
+            staffMembers.forEach(staff => {
+                // Add Full Name
+                if (staff.name) searchTerms.push({ term: staff.name, staff });
 
-            sortedStaff.forEach(staff => {
-                const mentionPattern = new RegExp(`@${staff.name}`, 'gi');
-                if (mentionPattern.test(noteBody)) {
-                    // It's a match!
-                    if (staff.uid !== user.uid) { // Don't notify self
-                        mentionedUserIds.add(staff.uid);
-                    }
-                    // Bold the mention in the saved HTML
-                    noteBody = noteBody.replace(mentionPattern, `<b>@${staff.name}</b>`);
-                } else {
-                    // Fallback: Check for just First Name if unique? 
-                    // For now, let's stick to full name or assume user types what matches the staff list
-                    // Or we can try to be smart:
-                    const firstName = staff.name.split(' ')[0];
-                    // Only check first name if we haven't already replaced the full name (regex above might have handled it if we are careful)
-                    // But complex replacement on HTML string is risky.
-                    // simplified: Just search for @First Last. 
-                    // If user wants to tag, they should type it reasonably correctly.
+                // Add First Name if distinct
+                const parts = staff.name.split(' ');
+                if (parts.length > 1 && parts[0].length > 1) {
+                    searchTerms.push({ term: parts[0], staff });
                 }
+            });
+
+            // 2. Sort by length descending to match "Brian Cummings" before "Brian"
+            searchTerms.sort((a, b) => b.term.length - a.term.length);
+
+            // 3. Tokenize replacement to avoid double-matching or matching inside replaced HTML
+            // Map token -> HTML replacement
+            const replacements = new Map<string, string>();
+            let tokenIndex = 0;
+
+            searchTerms.forEach(({ term, staff }) => {
+                // Regex: Match @Term with word boundary, case-insensitive
+                const pattern = new RegExp(`@${escapeRegExp(term)}\\b`, 'gi');
+
+                // We use a replace function to capture the actual matched text (preserving case if we wanted, 
+                // but we usually normalize to the Staff Name for the bold text).
+                // Actually, let's keep the user's casing but format it? 
+                // Or standardized to @StaffName? Standardized is cleaner.
+
+                // We only replace if it's NOT already part of a token (unlikely due to unique token format)
+                // noteBody is mutated in this loop.
+                const token = `__MENTION_TOKEN_${tokenIndex++}__`;
+
+                let foundMatch = false;
+                noteBody = noteBody.replace(pattern, (match) => {
+                    foundMatch = true;
+                    replacements.set(token, `<b>@${staff.name}</b>`);
+                    return token;
+                });
+
+                if (foundMatch && staff.uid !== user.uid) {
+                    mentionedUserIds.add(staff.uid);
+                }
+            });
+
+            // 4. Swap tokens back to HTML
+            replacements.forEach((html, token) => {
+                noteBody = noteBody.split(token).join(html);
             });
             // --- Mention Logic End ---
 
