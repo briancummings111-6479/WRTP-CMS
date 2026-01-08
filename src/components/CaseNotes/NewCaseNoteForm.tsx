@@ -123,7 +123,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const noteBody = editorRef.current?.innerHTML || '';
+        let noteBody = editorRef.current?.innerHTML || '';
         if (!noteBody.trim() || !user) return;
 
         setSubmitting(true);
@@ -133,6 +133,38 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
 
             // Find selected author details
             const selectedAuthor = staffMembers.find(s => s.uid === selectedAuthorId) || { uid: user.uid, name: user.name };
+
+            // --- Mention Logic Start ---
+            const mentionedUserIds = new Set<string>();
+
+            // Simple regex to find @Name patterns (e.g., @Brian, @Brian Cummings)
+            // We'll replace them with bold tags and collect IDs to notify
+            // We iterate staff members to find matches in the text to avoid false positives or partial matches
+
+            // Sort staff by name length desc to match full names before first names
+            const sortedStaff = [...staffMembers].sort((a, b) => b.name.length - a.name.length);
+
+            sortedStaff.forEach(staff => {
+                const mentionPattern = new RegExp(`@${staff.name}`, 'gi');
+                if (mentionPattern.test(noteBody)) {
+                    // It's a match!
+                    if (staff.uid !== user.uid) { // Don't notify self
+                        mentionedUserIds.add(staff.uid);
+                    }
+                    // Bold the mention in the saved HTML
+                    noteBody = noteBody.replace(mentionPattern, `<b>@${staff.name}</b>`);
+                } else {
+                    // Fallback: Check for just First Name if unique? 
+                    // For now, let's stick to full name or assume user types what matches the staff list
+                    // Or we can try to be smart:
+                    const firstName = staff.name.split(' ')[0];
+                    // Only check first name if we haven't already replaced the full name (regex above might have handled it if we are careful)
+                    // But complex replacement on HTML string is risky.
+                    // simplified: Just search for @First Last. 
+                    // If user wants to tag, they should type it reasonably correctly.
+                }
+            });
+            // --- Mention Logic End ---
 
             // Handle File Uploads
             const uploadedAttachments: { fileName: string; storageUrl: string }[] = [...attachments]; // Start with existing attachments if editing
@@ -199,6 +231,40 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                 };
                 await api.addCaseNote(newNoteData);
             }
+
+            // --- Send Notifications ---
+            if (mentionedUserIds.size > 0) {
+                // Get Client Name for the message (optimistic: we don't have it in props, but we can try generic or fetch it)
+                // Actually we only have clientId. The notification message should ideally say the client name.
+                // We can fetch client or just say "a client".
+                // Let's try to pass clientName if possible, or fetch it.
+                // For now, "a client" is safe, or we use a quick fetch if we had client info.
+                // Wait, this component is likely used inside CaseNotesSection which might know the client name?
+                // No, it just receives clientId.
+                // Checking imports... CaseNotesSection might have it.
+                // Let's fetch it quickly or just say "a client". 
+                // Actually, to make it nice, let's fetch the client name once on mount or use a generic message.
+                // Optimization: Let's assume generic "a note" or fetch.
+                // Let's fetch client details in a useEffect to have the name ready for notification.
+            }
+            // For the sake of this edit, I can't add a useEffect easily without replacing the whole component.
+            // I'll do the fetch inside the submit or just use "a client".
+            // Since `api` functions are available, I'll do a quick fetch inside logic if I really want the name.
+            // But let's keep it simple: "mentioned you in a note."
+
+            for (const mentionedUid of mentionedUserIds) {
+                await api.addNotification({
+                    userId: mentionedUid,
+                    type: 'mention',
+                    message: `${selectedAuthor.name} mentioned you in a case note.`,
+                    relatedItemId: clientId, // Use ClientID so clicking goes to the client 
+                    relatedItemType: 'case_note', // Maps to client view
+                    relatedClientId: clientId,
+                    dateCreated: Date.now(),
+                    read: false
+                });
+            }
+
             resetForm();
             onSave();
         } catch (error) {

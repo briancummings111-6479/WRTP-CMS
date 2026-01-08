@@ -300,10 +300,10 @@ export interface Workshop {
 export interface Notification {
   id: string;
   userId: string; // The user receiving the notification
-  type: 'assignment';
+  type: 'assignment' | 'mention';
   message: string;
-  relatedItemId?: string; // ID of the Task or Workshop
-  relatedItemType: 'task' | 'workshop';
+  relatedItemId?: string; // ID of the Task, Workshop, or Client (for case notes)
+  relatedItemType: 'task' | 'workshop' | 'case_note';
   relatedClientId?: string;
   dateCreated: number;
   read: boolean;
