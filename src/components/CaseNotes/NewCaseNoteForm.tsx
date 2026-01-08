@@ -37,6 +37,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     // New state for Author dropdown
     const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>('');
+    const [detectedMentions, setDetectedMentions] = useState<{ uid: string; name: string }[]>([]);
 
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,6 +108,50 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     const handleFormat = (command: string) => {
         editorRef.current?.focus();
         document.execCommand(command, false);
+    };
+
+    const escapeRegExp = (string: string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    const parseMentions = (text: string) => {
+        if (!text) {
+            setDetectedMentions([]);
+            return;
+        }
+
+        const mentions = new Map<string, { uid: string; name: string }>();
+        const sortedStaff = [...staffMembers].sort((a, b) => b.name.length - a.name.length);
+
+        sortedStaff.forEach(staff => {
+            // Check Full Name
+            if (staff.name && new RegExp(`@${escapeRegExp(staff.name)}\\b`, 'i').test(text)) {
+                if (staff.uid !== user?.uid) mentions.set(staff.uid, staff);
+            } else {
+                // Check First Name (only if distinct and not already matched by full name logic implicitly? 
+                // Actually regex search for "Brian" matches "Brian Cummings" too.
+                // But we want to detect if the user typed ANY recognized name.
+                // So looping is fine.
+                const parts = staff.name.split(' ');
+                if (parts.length > 1 && parts[0].length > 1) {
+                    if (new RegExp(`@${escapeRegExp(parts[0])}\\b`, 'i').test(text)) {
+                        if (staff.uid !== user?.uid) mentions.set(staff.uid, staff);
+                    }
+                }
+            }
+        });
+
+        setDetectedMentions(Array.from(mentions.values()));
+    };
+
+    const handleInput = () => {
+        if (editorRef.current) {
+            // Use innerText for detection (strips HTML tags, handles &nbsp; as space usually)
+            // Note: innerText might not convert &nbsp; to space in all browsers, but usually does.
+            // Let's normalize just in case.
+            const text = editorRef.current.innerText.replace(/\u00a0/g, ' ');
+            parseMentions(text);
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -378,6 +423,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                         <div
                             ref={editorRef}
                             contentEditable
+                            onInput={handleInput}
                             className="p-3 min-h-[120px] focus:outline-none"
                             aria-label="Note body editor"
                         ></div>
@@ -385,7 +431,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                 </div>
 
                 {/* Duration and Attachments */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Duration (Minutes)</label>
                         <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(parseInt(e.target.value, 10))} className="form-input" min="0" />
@@ -395,6 +441,20 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="form-input text-sm p-1.5" />
                     </div>
                 </div>
+
+                {/* Detected Mentions Feedback */}
+                {detectedMentions.length > 0 && (
+                    <div className="flex items-center space-x-2 text-sm text-[#404E3B] bg-green-50 p-2 rounded-md border border-green-100">
+                        <span className="font-semibold">Mentions to notify:</span>
+                        <div className="flex flex-wrap gap-2">
+                            {detectedMentions.map(u => (
+                                <span key={u.uid} className="bg-white px-2 py-0.5 rounded shadow-sm text-xs border border-green-200">
+                                    @{u.name}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Display Selected Files (Pending Upload) */}
                 {selectedFiles.length > 0 && (
