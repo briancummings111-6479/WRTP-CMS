@@ -490,11 +490,11 @@ const api = {
   // --- User Management Functions ---
   updateUser: async (user: AppUser): Promise<void> => {
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       name: user.name,
       role: user.role,
       title: user.title
-    });
+    }, { merge: true });
   },
 
   // In a real app with Firebase Admin SDK, we would create the auth user here.
