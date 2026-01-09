@@ -105,15 +105,13 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
                 {showAll ? <ChevronUp className="h-4 w-4" /> : <List className="h-4 w-4" />}
               </button>
             )}
-            {user?.role === 'admin' && (
-              <button
-                onClick={() => handleOpenModal()}
-                className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
-                aria-label="Add new task"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              onClick={() => handleOpenModal()}
+              className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
+              aria-label="Add new task"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
         }
       >

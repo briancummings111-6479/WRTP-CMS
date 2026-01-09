@@ -101,9 +101,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     }, [noteToEdit, isEditing]);
 
 
-    if (user?.role !== 'admin') {
-        return null; // Don't render form for non-admins
-    }
+
 
     const handleFormat = (command: string) => {
         editorRef.current?.focus();

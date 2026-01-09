@@ -75,15 +75,13 @@ const WorkshopsSection: React.FC<WorkshopsSectionProps> = ({ clientId, clientNam
       <Card
         title="Workshop Status"
         titleAction={
-          user?.role === 'admin' && (
-            <button
-              onClick={() => handleOpenModal()}
-              className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
-              aria-label="Add new workshop"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          )
+          <button
+            onClick={() => handleOpenModal()}
+            className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
+            aria-label="Add new workshop"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         }
       >
         {loading ? (
@@ -104,7 +102,7 @@ const WorkshopsSection: React.FC<WorkshopsSectionProps> = ({ clientId, clientNam
             )}
           </div>
         )}
-      </Card>
+      </Card >
       {isModalOpen && (
         <AddEditWorkshopModal
           isOpen={isModalOpen}
@@ -115,7 +113,8 @@ const WorkshopsSection: React.FC<WorkshopsSectionProps> = ({ clientId, clientNam
           clientName={clientName}
           admins={admins}
         />
-      )}
+      )
+      }
     </>
   );
 };
