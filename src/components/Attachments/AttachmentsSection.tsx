@@ -150,7 +150,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!uploading && user?.role === 'admin') {
+        if (!uploading) {
             setIsDragging(true);
         }
     };
@@ -166,14 +166,14 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
         e.stopPropagation();
         setIsDragging(false);
 
-        if (uploading || user?.role !== 'admin') return;
+        if (uploading) return;
 
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             await processFiles(Array.from(e.dataTransfer.files));
         }
     };
 
-    const uploadButton = user?.role === 'admin' && (
+    const uploadButton = (
         <>
             <input
                 type="file"
@@ -230,7 +230,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
                                 <Paperclip className="mx-auto h-12 w-12 text-gray-400" />
                                 <h3 className="mt-2 text-sm font-medium text-gray-900">No attachments</h3>
                                 <p className="mt-1 text-sm text-gray-500">
-                                    {user?.role === 'admin' ? 'Upload a file or drag and drop here.' : 'No files available.'}
+                                    Upload a file or drag and drop here.
                                 </p>
                             </div>
                         )}

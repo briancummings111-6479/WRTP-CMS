@@ -472,6 +472,10 @@ const ClientDashboardPage: React.FC = () => {
     { key: 'coverLetter', label: 'Cover Letter' },
   ];
 
+  const subscriptionMap: { key: TrainingBooleanKeys, label: string }[] = [
+    { key: 'currentJobListingsEmail', label: 'Current Job Listings Email' },
+  ];
+
   if (loading) return <div>Loading client data...</div>;
   if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
   if (!client) return <div className="p-4">Client not found (ID: {clientId})</div>;
@@ -783,6 +787,19 @@ const ClientDashboardPage: React.FC = () => {
                               ) : <p className="text-sm text-gray-500">No work documents on file.</p>}
                             </div>
                           </div>
+
+                          <hr className="border-gray-200" />
+
+                          <div>
+                            <h4 className="text-md font-medium text-gray-800 mb-2">Subscriptions</h4>
+                            <div className="space-y-2">
+                              {subscriptionMap.filter(sub => trainingData[sub.key]).length > 0 ? (
+                                subscriptionMap.map(sub =>
+                                  trainingData[sub.key] && <DisplayListItem key={sub.key} label={sub.label} />
+                                )
+                              ) : <p className="text-sm text-gray-500">No subscriptions on file.</p>}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -856,6 +873,22 @@ const ClientDashboardPage: React.FC = () => {
                                   label={doc.label}
                                   name={doc.key}
                                   checked={Boolean(trainingData && trainingData[doc.key])}
+                                  onChange={handleTrainingChange}
+                                />
+                              ))}
+                            </div>
+                          </fieldset>
+
+                          {/* Subscriptions Section */}
+                          <fieldset className="space-y-4 p-4 border rounded-md">
+                            <legend className="text-md font-medium text-gray-700 px-1">Subscriptions</legend>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              {subscriptionMap.map(sub => (
+                                <CheckboxInput
+                                  key={sub.key}
+                                  label={sub.label}
+                                  name={sub.key}
+                                  checked={Boolean(trainingData && trainingData[sub.key])}
                                   onChange={handleTrainingChange}
                                 />
                               ))}

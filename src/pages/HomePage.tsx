@@ -102,15 +102,13 @@ const HomePage: React.FC = () => {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          {user?.role === 'admin' && (
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#404E3B]"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add Client
-            </button>
-          )}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#404E3B]"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Add Client
+          </button>
         </div>
 
         <div className="grid grid-cols-1 gap-6">
@@ -222,14 +220,12 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       </div>
-      {user?.role === 'admin' && (
-        <AddClientModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onSave={handleSaveNewClient}
-          staff={staff}
-        />
-      )}
+      <AddClientModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSave={handleSaveNewClient}
+        staff={staff}
+      />
     </>
   );
 };

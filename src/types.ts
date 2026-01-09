@@ -168,6 +168,8 @@ export interface Client {
     workPermit?: boolean;
     resume?: boolean;
     coverLetter?: boolean;
+    // Subscriptions
+    currentJobListingsEmail?: boolean;
   };
 
   demographics?: Demographics;
