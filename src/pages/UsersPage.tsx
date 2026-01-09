@@ -58,7 +58,14 @@ const UsersPage: React.FC = () => {
             // but let's be explicit.
             const userToUpdate = users.find(u => u.uid === editingUserId);
             if (userToUpdate) {
-                await api.updateUser({ ...userToUpdate, ...editForm });
+                const payload = { ...userToUpdate, ...editForm };
+                try {
+                    await api.updateUser(payload);
+                    alert(`Success: Updated user ${payload.name} to Title: "${payload.title}"`);
+                } catch (innerError: any) {
+                    alert(`Creating/Updating failed: ${innerError.message}`);
+                    throw innerError;
+                }
             }
 
             setEditingUserId(null);
