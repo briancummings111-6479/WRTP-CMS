@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/firebase';
 import { Client, Workshop, CaseNote } from '../types';
 import Card from '../components/Card';
-import { Printer } from 'lucide-react';
+import { Printer, Sparkles, Send, Bot, XCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,11 +31,17 @@ const ReportsPage: React.FC = () => {
     const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
     const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'population' | 'encounters' | 'barriers' | 'workshopMatrix' | 'workshopAttendance' | 'narrative'>('population');
+    const [activeTab, setActiveTab] = useState<'population' | 'encounters' | 'barriers' | 'workshopMatrix' | 'workshopAttendance' | 'narrative' | 'aiInsights'>('population');
     const [workshopFilter, setWorkshopFilter] = useState('All');
     const [selectedCaseManager, setSelectedCaseManager] = useState('All');
     const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
     const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>('All');
+
+    // AI Insights State
+    const [aiQuery, setAiQuery] = useState('');
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState('');
 
     // Narrative Report State - Restored
     const [reportMonth, setReportMonth] = useState<string>(() => {
@@ -755,28 +761,53 @@ const ReportsPage: React.FC = () => {
         }
     };
 
+    const handleAIQuerySubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!aiQuery.trim()) return;
+
+        setAiLoading(true);
+        setAiError('');
+        setAiAnswer('');
+
+        try {
+            const result = await api.queryKnowledgeBase(aiQuery);
+            setAiAnswer(result.answer);
+        } catch (err: any) {
+            console.error("AI Query Error:", err);
+            setAiError(err.message || 'Failed to analyze query.');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
     if (loading) {
-        return <div>Loading report data...</div>;
+        return <div className="p-8 text-center text-gray-500">Loading report data...</div>;
     }
 
     const StatListItem: React.FC<{ label: string, value: number, percentage: number }> = ({ label, value, percentage }) => (
-        <li className="flex justify-between items-baseline">
-            <span className="text-gray-700">{label}:</span>
-            <span className="font-semibold text-gray-800">{value} <span className="text-sm font-normal text-gray-500">({percentage.toFixed(1)}%)</span></span>
+        <li className="flex justify-between items-baseline py-1 border-b border-gray-50 last:border-0">
+            <span className="text-gray-600 text-sm">{label}</span>
+            <span className="font-medium text-gray-900 text-sm">
+                {value} <span className="text-xs font-normal text-gray-500 ml-1">({percentage.toFixed(1)}%)</span>
+            </span>
         </li>
     );
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center no-print">
-                <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
-                <div className="flex items-center space-x-2">
-                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700">WRTP Staff:</label>
+        <div className="space-y-6 max-w-7xl mx-auto p-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Reports Dashboard</h1>
+                    <p className="text-gray-500 mt-1">Analytics and performance metrics</p>
+                </div>
+
+                <div className="flex items-center space-x-3 bg-white p-1.5 rounded-lg shadow-sm border border-gray-200">
+                    <label htmlFor="caseManagerFilter" className="text-sm font-medium text-gray-700 pl-2">Filter Staff:</label>
                     <select
                         id="caseManagerFilter"
                         value={selectedCaseManager}
                         onChange={(e) => setSelectedCaseManager(e.target.value)}
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] sm:text-sm rounded-md"
+                        className="block w-48 pl-3 pr-8 py-1.5 text-sm border-gray-300 focus:outline-none focus:ring-[#404E3B] focus:border-[#404E3B] rounded-md"
                     >
                         <option value="All">All Staff</option>
                         {admins.map(admin => (
@@ -787,58 +818,91 @@ const ReportsPage: React.FC = () => {
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex space-x-2 mb-6 no-print">
+            <div className="flex overflow-x-auto space-x-1 mb-6 no-print bg-gray-100/50 p-1 rounded-lg">
                 <button
                     onClick={() => setActiveTab('population')}
-                    className={`px-4 py-2 rounded-md ${activeTab === 'population' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'population'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
                 >
-                    Client Population
+                    Population
                 </button>
                 <button
                     onClick={() => setActiveTab('encounters')}
-                    className={`px-4 py-2 rounded-md ${activeTab === 'encounters' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'encounters'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
                 >
                     Encounters
                 </button>
                 <button
                     onClick={() => setActiveTab('barriers')}
-                    className={`px-4 py-2 rounded-md ${activeTab === 'barriers' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'barriers'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
                 >
-                    Barriers Report
+                    Barriers
                 </button>
                 <button
                     onClick={() => setActiveTab('workshopMatrix')}
-                    className={`px-4 py-2 rounded-md ${activeTab === 'workshopMatrix' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'workshopMatrix'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
                 >
                     Workshop Matrix
                 </button>
                 <button
                     onClick={() => setActiveTab('workshopAttendance')}
-                    className={`px-4 py-2 rounded-md ${activeTab === 'workshopAttendance' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'workshopAttendance'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
                 >
-                    Workshop Attendance
+                    Attendance
                 </button>
-                {/* NEW: Narrative Report Tab - Admin Only */}
+
+                {/* Admin Only Tabs */}
                 {user?.role === 'admin' && (
-                    <button
-                        onClick={() => setActiveTab('narrative')}
-                        className={`px-4 py-2 rounded-md flex items-center gap-2 ${activeTab === 'narrative' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                        <span className="text-xs">✨</span> AI Narrative
-                    </button>
+                    <>
+                        <button
+                            onClick={() => setActiveTab('narrative')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center space-x-1 ${activeTab === 'narrative'
+                                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                : 'text-gray-600 hover:text-blue-600 hover:bg-white/50'
+                                }`}
+                        >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>Narrative</span>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('aiInsights')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center space-x-1 ${activeTab === 'aiInsights'
+                                ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5'
+                                : 'text-gray-600 hover:text-purple-600 hover:bg-white/50'
+                                }`}
+                        >
+                            <Bot className="h-3.5 w-3.5" />
+                            <span>AI Insights</span>
+                        </button>
+                    </>
                 )}
             </div>
 
+            {/* Narrative Report Tab */}
             {activeTab === 'narrative' && user?.role === 'admin' && (
                 <Card
                     title="Narrative Report Generator"
-                    className="no-print border-purple-200"
-                    titleAction={<span className="text-xl">✨</span>}
+                    className="no-print border-blue-100"
+                    titleAction={<Sparkles className="h-5 w-5 text-blue-400" />}
                 >
-                    <div className="bg-purple-50 p-4 rounded-lg mb-6 border border-purple-100">
-                        <p className="text-sm text-purple-800">
-                            Use Google Gemini AI to generate a narrative monthly report for the City of Redding.
-                            This tool analyzes client intakes, workshops, and case notes for the selected month.
+                    <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
+                        <p className="text-sm text-blue-800">
+                            Use Google Gemini AI to generate a narrative monthly report.
+                            This tool analyzes client intakes, workshops, and case notes.
                         </p>
                     </div>
 
@@ -849,7 +913,7 @@ const ReportsPage: React.FC = () => {
                                 type="month"
                                 value={reportMonth}
                                 onChange={(e) => setReportMonth(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                         <div>
@@ -859,9 +923,8 @@ const ReportsPage: React.FC = () => {
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
                                 placeholder="AIza..."
-                                className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                             />
-                            <p className="text-xs text-gray-500 mt-1">Get key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">Google AI Studio</a></p>
                         </div>
                     </div>
 
@@ -875,9 +938,9 @@ const ReportsPage: React.FC = () => {
                         onClick={generateNarrativeReport}
                         disabled={isGenerating}
                         className={`w-full py-3 rounded-md font-medium text-white transition-all
-                        ${isGenerating
-                                ? 'bg-purple-400 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md transform active:scale-[0.99]'
+                                ${isGenerating
+                                ? 'bg-blue-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md transform active:scale-[0.99]'
                             }`}
                     >
                         {isGenerating ? 'Generating Report...' : 'Generate Narrative Report'}
@@ -889,7 +952,7 @@ const ReportsPage: React.FC = () => {
                                 <h4 className="text-lg font-semibold text-gray-900">Generated Report</h4>
                                 <button
                                     onClick={() => navigator.clipboard.writeText(generatedReport)}
-                                    className="text-sm text-purple-600 hover:text-purple-800 font-medium px-3 py-1 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+                                    className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                                 >
                                     Copy to Clipboard
                                 </button>
@@ -902,353 +965,79 @@ const ReportsPage: React.FC = () => {
                 </Card>
             )}
 
-            {/* Client Population Report */}
-            {activeTab === 'population' && (
+            {/* AI Insights Tab */}
+            {activeTab === 'aiInsights' && user?.role === 'admin' && (
                 <Card
-                    title="Client Population Report"
-                    className="no-print"
-                    titleAction={
-                        <button
-                            onClick={handlePrintClientReport}
-                            className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            <Printer className="h-4 w-4 mr-2" />
-                            Print Report
-                        </button>
-                    }
+                    title="AI Insights (Beta)"
+                    className="no-print border-purple-200"
+                    titleAction={<Bot className="h-5 w-5 text-purple-600" />}
                 >
-                    {/* Section 1: Overall Breakdown */}
-                    <div className="border-b border-gray-200 pb-4 mb-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-3">Overall Breakdown</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
-                            <div>
-                                <p className="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
-                                <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span className="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
+                    <div className="bg-purple-50 p-4 rounded-lg mb-6 border border-purple-100">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <Sparkles className="h-5 w-5 text-purple-400" aria-hidden="true" />
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
-                                <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span className="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
-                                <p className="text-3xl font-bold text-gray-800">{reportData.totalIndividuals}</p>
+                            <div className="ml-3">
+                                <p className="text-sm text-purple-900 font-medium">Ask open-ended questions about your data</p>
+                                <p className="text-sm text-purple-700 mt-1">
+                                    The AI analyzes workshops, case notes, and client profiles from the last 12 months.
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Section 2: Enrolled Client Details */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-3">Enrolled Client Details <span className="font-normal text-gray-500">({reportData.enrolledClientsCount} total)</span></h3>
-                        {reportData.enrolledClientsCount > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Sub-section: By Type */}
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="font-semibold text-gray-800 mb-2">By Type</h4>
-                                    <ul className="space-y-2 text-sm">
-                                        <StatListItem label="General Population" value={reportData.generalPopulationCount} percentage={reportData.generalPopulationPercentage} />
-                                        <StatListItem label="CHYBA" value={reportData.chybaCount} percentage={reportData.chybaPercentage} />
-                                    </ul>
-                                </div>
-                                {/* Sub-section: By Status */}
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="font-semibold text-gray-800 mb-2">By Status</h4>
-                                    <ul className="space-y-2 text-sm">
-                                        <StatListItem label="Active" value={reportData.activeCount} percentage={reportData.activePercentage} />
-                                        <StatListItem label="Inactive" value={reportData.inactiveCount} percentage={reportData.inactivePercentage} />
-                                    </ul>
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="text-center text-gray-500 py-6">No enrolled clients to analyze.</p>
-                        )}
-                    </div>
-                </Card>
-            )}
-
-            {/* Encounters Report */}
-            {activeTab === 'encounters' && (
-                <Card
-                    title="Encounters Report"
-                    className="no-print"
-                    titleAction={
-                        <div className="flex items-center space-x-2">
-                            <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
-                            <select
-                                id="encountersMonthFilter"
-                                value={encountersMonthFilter}
-                                onChange={(e) => setEncountersMonthFilter(e.target.value)}
-                                className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                            >
-                                <option value="All">All Months</option>
-                                {encountersReportData.availableMonths.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                    }
-                >
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-8">
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
-                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.totalEncounters}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
-                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.caseNotesCount}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
-                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.contactNotesCount}</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops Delivered</p>
-                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.workshopsCount}</p>
-                        </div>
-                    </div>
-
-                    <div className="h-[400px] w-full mt-8">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Encounters Trend</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                layout="vertical"
-                                data={encountersReportData.graphData}
-                                margin={{
-                                    top: 20,
-                                    right: 30,
-                                    left: 20,
-                                    bottom: 30,
-                                }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                    <form onSubmit={handleAIQuerySubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="aiQuery" className="block text-sm font-medium text-gray-700">Your Question</label>
+                            <div className="mt-1 flex rounded-md shadow-sm">
+                                <input
+                                    type="text"
+                                    id="aiQuery"
+                                    className="flex-1 min-w-0 block w-full px-4 py-3 rounded-none rounded-l-md border-gray-300 focus:ring-purple-500 focus:border-purple-500 sm:text-sm border"
+                                    placeholder="e.g., How many clients attended the job preparedness workshop last week?"
+                                    value={aiQuery}
+                                    onChange={(e) => setAiQuery(e.target.value)}
                                 />
-                                <Legend />
-                                <Bar dataKey="caseNotes" name="Case Notes" stackId="a" fill="#4D7C7B" />
-                                <Bar dataKey="workshops" name="Workshops Delivered" stackId="a" fill="#9CB072" />
-                                <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#6B7280" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
-            )}
-
-            {/* Barriers to Employment Report */}
-            {activeTab === 'barriers' && (
-                <Card
-                    title="Barriers to Employment"
-                    className="no-print"
-                    titleAction={
-                        <button
-                            onClick={handlePrintBarriersReport}
-                            className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                            <Printer className="h-4 w-4 mr-2" />
-                            Print Report
-                        </button>
-                    }
-                >
-                    <div className="mb-4">
-                        <p className="text-sm text-gray-500">Analysis based on <span className="font-semibold text-gray-700">{barriersReportData.totalActive} Active</span> clients.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Chart Area */}
-                        <div className="h-[400px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    layout="vertical"
-                                    data={barriersReportData.data}
-                                    margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+                                <button
+                                    type="submit"
+                                    disabled={aiLoading || !aiQuery.trim()}
+                                    className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-r-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                    <XAxis type="number" unit="%" />
-                                    <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
-                                    <Tooltip
-                                        cursor={{ fill: 'transparent' }}
-                                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Percentage']}
-                                    />
-                                    <Legend />
-                                    <Bar dataKey="genPopPercentage" name="Gen Pop %" fill="#4D7C7B" />
-                                    <Bar dataKey="chybaPercentage" name="CHYBA %" fill="#E6A532" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        {/* Table Area */}
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Barrier</th>
-                                        <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Gen Pop</th>
-                                        <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">CHYBA</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {barriersReportData.data.map((barrier) => (
-                                        <tr key={barrier.name}>
-                                            <td className="px-3 py-2 font-medium text-gray-900">{barrier.name}</td>
-                                            <td className="px-3 py-2 text-center">
-                                                <div className="text-gray-900 font-semibold">{barrier.genPopCount}</div>
-                                                <div className="text-xs text-gray-500">{barrier.genPopPercentage.toFixed(1)}%</div>
-                                            </td>
-                                            <td className="px-3 py-2 text-center">
-                                                <div className="text-gray-900 font-semibold">{barrier.chybaCount}</div>
-                                                <div className="text-xs text-gray-500">{barrier.chybaPercentage.toFixed(1)}%</div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </Card>
-            )}
-
-            {activeTab === 'workshopMatrix' && (
-                <Card
-                    title="Workshop Matrix Report"
-                    titleAction={
-                        <div className="flex items-center space-x-2">
-                            <label htmlFor="matrixStatusFilter" className="text-sm font-medium text-gray-700">Filter Status:</label>
-                            <select
-                                id="matrixStatusFilter"
-                                value={matrixStatusFilter}
-                                onChange={(e) => setMatrixStatusFilter(e.target.value)}
-                                className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                            >
-                                <option value="All">All Statuses</option>
-                                <option value="Scheduled">Scheduled</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Completed">Completed</option>
-                                <option value="Declined">Declined</option>
-                                <option value="No Show">No Show</option>
-                                <option value="Blank">Not Enrolled (Blank)</option>
-                            </select>
-                        </div>
-                    }
-                >
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
-                                        Client Name
-                                    </th>
-                                    {workshopMatrixData.allWorkshopNames.map(name => (
-                                        <th key={name} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                                            {name}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {workshopMatrixData.matrix.map(({ client, workshopStatusMap }) => (
-                                    <tr key={client.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 border-r">
-                                            <Link to={`/clients/${client.id}`} className="text-[#404E3B] hover:underline">
-                                                {client.profile.firstName} {client.profile.lastName}
-                                            </Link>
-                                        </td>
-                                        {workshopMatrixData.allWorkshopNames.map(name => (
-                                            <td key={name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {workshopStatusMap[name] ? (
-                                                    <WorkshopStatusBadge status={workshopStatusMap[name]} />
-                                                ) : (
-                                                    <span className="text-gray-300">-</span>
-                                                )}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
-                                {workshopMatrixData.matrix.length === 0 && (
-                                    <tr>
-                                        <td colSpan={workshopMatrixData.allWorkshopNames.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
-                                            No clients found matching the criteria.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
-            )}
-
-            {activeTab === 'workshopAttendance' && (
-                <Card
-                    title="Workshop Attendance List"
-                    className="printable-card"
-                    titleAction={
-                        <div className="relative z-10 flex items-center space-x-4 no-print">
-                            <div>
-                                <label htmlFor="workshopFilter" className="sr-only">Filter by workshop</label>
-                                <select
-                                    id="workshopFilter"
-                                    value={workshopFilter}
-                                    onChange={e => setWorkshopFilter(e.target.value)}
-                                    className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                                >
-                                    <option value="All">All Workshops</option>
-                                    {workshopReportData.workshopNames.map(name => <option key={name} value={name}>{name}</option>)}
-                                </select>
+                                    {aiLoading ? (
+                                        'Analyzing...'
+                                    ) : (
+                                        <>
+                                            <Send className="h-4 w-4 mr-2" />
+                                            Ask AI
+                                        </>
+                                    )}
+                                </button>
                             </div>
-                            <button
-                                onClick={handlePrintWorkshopReport}
-                                className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                            >
-                                <Printer className="h-4 w-4 mr-2" />
-                                Print Report
-                            </button>
                         </div>
-                    }
-                >
-                    <div id="workshop-report-printable" className="space-y-8">
-                        {workshopReportData.workshopNames.filter(name => workshopFilter === 'All' || name === workshopFilter).map(workshopName => (
-                            <div key={workshopName} className="break-inside-avoid">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-3">{workshopName}</h3>
-                                <div className="overflow-x-auto border rounded-lg">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workshop Date</th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Staff</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {workshopReportData.groupedWorkshops[workshopName].map(entry => (
-                                                <tr key={entry.id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <Link to={`/clients/${entry.clientId}`} className="text-sm font-medium text-[#404E3B] hover:underline">
-                                                            {entry.clientName}
-                                                        </Link>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <WorkshopStatusBadge status={entry.status} />
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {new Date(entry.workshopDate).toLocaleDateString()}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.assignedToName}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    </form>
+
+                    {aiError && (
+                        <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md border border-red-100 flex items-start">
+                            <XCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+                            <span>{aiError}</span>
+                        </div>
+                    )}
+
+                    {aiAnswer && (
+                        <div className="mt-8 border-t pt-6 animation-fade-in">
+                            <h3 className="text-lg font-medium text-gray-900 flex items-center mb-4">
+                                <Bot className="h-5 w-5 mr-2 text-purple-600" />
+                                AI Answer
+                            </h3>
+                            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 prose prose-purple max-w-none whitespace-pre-wrap leading-relaxed text-gray-800 shadow-sm">
+                                {aiAnswer}
                             </div>
-                        ))}
-                        {workshopReportData.workshopNames.length === 0 && !loading && (
-                            <p className="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </Card>
             )}
-        </div>
+
+        </div >
     );
 };
 

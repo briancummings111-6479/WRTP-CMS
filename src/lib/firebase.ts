@@ -693,6 +693,13 @@ const api = {
     return result.data as { summary: string, caseNoteCount?: number, workshopCount?: number };
   },
 
+  // --- AI Knowledge Base Query ---
+  queryKnowledgeBase: async (query: string, timeRangeMonths: number = 12): Promise<{ answer: string }> => {
+    const fn = httpsCallable(functions, 'queryKnowledgeBase');
+    const result = await fn({ query, timeRangeMonths });
+    return result.data as { answer: string };
+  },
+
   // --- Grant Report Helpers ---
   getActiveClientsForRange: async (startDate: Date, endDate: Date): Promise<Client[]> => {
     const startTimestamp = startDate.getTime();
