@@ -121,8 +121,10 @@ const AddEditWorkshopModal: React.FC<AddEditWorkshopModalProps> = ({ isOpen, onC
                   <option value="Scheduled">Scheduled</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
+                  <option value="Canceled">Canceled</option>
                   <option value="Declined">Declined</option>
                   <option value="No Show">No Show</option>
+                  <option value="On Hold">On Hold</option>
                 </select>
               </div>
               <div>

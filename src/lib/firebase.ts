@@ -14,7 +14,8 @@ import {
   where,
   orderBy,
   onSnapshot,
-  Firestore
+  Firestore,
+  documentId
 } from "firebase/firestore";
 import {
   getAuth,
@@ -25,6 +26,7 @@ import {
   User
 } from "firebase/auth";
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { getFunctions, httpsCallable, connectFunctionsEmulator, Functions } from "firebase/functions";
 import { getAnalytics, Analytics } from "firebase/analytics";
 
 // Import our custom types
@@ -36,7 +38,8 @@ import {
   ISP,
   Demographics,
   User as AppUser,
-  Workshop
+  Workshop,
+  Notification
 } from "../types";
 
 // --- Configuration ---
@@ -61,7 +64,13 @@ if (!getApps().length) {
 const db: Firestore = getFirestore(app);
 const auth: Auth = getAuth(app);
 const storage: FirebaseStorage = getStorage(app);
+const functions: Functions = getFunctions(app);
 const analytics: Analytics = getAnalytics(app);
+
+// Connect to emulators if working locally
+if (location.hostname === "localhost") {
+  connectFunctionsEmulator(functions, "localhost", 5001);
+}
 
 // --- Default Values ---
 const defaultDemographics: Demographics = {
@@ -139,18 +148,60 @@ const defaultDemographics: Demographics = {
 
 // --- API Object ---
 // --- Helper to sanitize data for Firestore (remove undefined) ---
-const sanitizeData = (data: any): any => {
+const sanitizeData = (data: any, visited = new WeakSet()): any => {
   if (data === null || data === undefined) return null;
-  if (Array.isArray(data)) return data.map(sanitizeData);
-  if (typeof data === 'object' && !(data instanceof Date)) {
+
+  if (typeof data === 'object' && data !== null) {
+    if (data instanceof Date) return data;
+
+    // Cycle detection
+    if (visited.has(data)) {
+      console.warn("Circular reference detected in sanitizeData, skipping.", data);
+      return null;
+    }
+    visited.add(data);
+
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizeData(item, visited));
+    }
+
     return Object.entries(data).reduce((acc, [key, value]) => {
       if (value !== undefined) {
-        acc[key] = sanitizeData(value);
+        acc[key] = sanitizeData(value, visited);
       }
       return acc;
     }, {} as any);
   }
+
   return data;
+};
+
+// --- Helper: Recalculate and Update Client's Last Case Note Date ---
+const updateClientLastCaseNoteDate = async (clientId: string) => {
+  try {
+    // We can't easily rely on complex queries with composite indexes being present in all environments.
+    // Safest approach: Fetch all notes for client (using existing index on clientId), filter & sort in memory.
+    // This reuses the logic we already trust in getCaseNotesByClientId, but we replicate it here to avoid
+    // circular dependency or issues if we haven't defined api yet.
+    const q = query(collection(db, "caseNotes"), where("clientId", "==", clientId));
+    const snapshot = await getDocs(q);
+    const notes = snapshot.docs.map(doc => doc.data() as CaseNote);
+
+    // Sort descending by date
+    notes.sort((a, b) => b.noteDate - a.noteDate);
+
+    // Find first note that is of type 'Case Note' (ignoring Contact Notes etc if any)
+    const latestNote = notes.find(n => n.noteType === 'Case Note');
+    const latestDate = latestNote ? latestNote.noteDate : null;
+
+    const clientRef = doc(db, "clients", clientId);
+    await updateDoc(clientRef, {
+      "metadata.lastCaseNoteDate": latestDate
+    });
+    console.log(`Updated client ${clientId} lastCaseNoteDate to ${latestDate ? new Date(latestDate).toISOString() : 'null'}`);
+  } catch (err) {
+    console.error(`Failed to update lastCaseNoteDate for client ${clientId}:`, err);
+  }
 };
 
 const api = {
@@ -247,7 +298,7 @@ const api = {
     const q = query(collection(db, "tasks"), where("assignedToId", "==", userId));
     const snapshot = await getDocs(q);
     const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
-    return tasks.filter(t => t.status !== 'Completed');
+    return tasks;
   },
 
   upsertTask: async (task: Partial<Task> & { clientId: string; title: string }): Promise<Task> => {
@@ -260,6 +311,23 @@ const api = {
       return task as Task;
     } else {
       const docRef = await addDoc(collection(db, "tasks"), sanitizeData(data));
+
+      // Notification Logic: If assigned to someone else, notify them
+      if (task.assignedToId && auth.currentUser && task.assignedToId !== auth.currentUser.uid) {
+        // We need to fetch the assigned user's name if not present, but usually we have it.
+        // Or we can just trust the ID.
+        await api.addNotification({
+          userId: task.assignedToId,
+          type: 'assignment',
+          message: `You have been assigned a new task: "${task.title}"`,
+          relatedItemId: docRef.id,
+          relatedItemType: 'task',
+          relatedClientId: task.clientId,
+          dateCreated: Date.now(),
+          read: false
+        });
+      }
+
       return { id: docRef.id, ...task } as Task;
     }
   },
@@ -269,6 +337,15 @@ const api = {
   },
 
   // --- Case Note Functions ---
+  getAllCaseNotes: async (): Promise<CaseNote[]> => {
+    const caseNotesCol = collection(db, "caseNotes");
+    const snapshot = await getDocs(caseNotesCol);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as CaseNote[];
+  },
+
   getCaseNotesByClientId: async (clientId: string): Promise<CaseNote[]> => {
     const q = query(collection(db, "caseNotes"), where("clientId", "==", clientId));
     const snapshot = await getDocs(q);
@@ -283,10 +360,15 @@ const api = {
     // The requirement said "Only include Case Notes, not Contact Notes" for the filter.
     if (noteData.noteType === 'Case Note') {
       const clientRef = doc(db, "clients", noteData.clientId);
+      // Optimistic update for immediate feedback, though the helper will also run
       await updateDoc(clientRef, {
         "metadata.lastCaseNoteDate": noteData.noteDate
       });
     }
+
+    // Recalculate to be sure (handles backdating if the new note is NOT the latest, etc.)
+    await updateClientLastCaseNoteDate(noteData.clientId);
+
 
     return { id: docRef.id, ...noteData } as CaseNote;
   },
@@ -295,11 +377,28 @@ const api = {
     const docRef = doc(db, "caseNotes", note.id);
     const { id, ...data } = note;
     await updateDoc(docRef, sanitizeData(data));
+
+    // Recalculate latest date
+    await updateClientLastCaseNoteDate(note.clientId);
+
     return note;
   },
 
   deleteCaseNote: async (noteId: string): Promise<void> => {
-    await deleteDoc(doc(db, "caseNotes", noteId));
+    // We need the clientId to update the parent client. 
+    // Since we only have noteId, we must fetch the note first to get the clientId.
+    const noteRef = doc(db, "caseNotes", noteId);
+    const noteSnap = await getDoc(noteRef);
+    let clientId = "";
+    if (noteSnap.exists()) {
+      clientId = noteSnap.data().clientId;
+    }
+
+    await deleteDoc(noteRef);
+
+    if (clientId) {
+      await updateClientLastCaseNoteDate(clientId);
+    }
   },
 
   // --- Attachment Functions ---
@@ -354,6 +453,21 @@ const api = {
       return workshop as Workshop;
     } else {
       const docRef = await addDoc(collection(db, "workshops"), sanitizeData(data));
+
+      // Notification Logic: If assigned to someone else, notify them
+      if (workshop.assignedToId && auth.currentUser && workshop.assignedToId !== auth.currentUser.uid) {
+        await api.addNotification({
+          userId: workshop.assignedToId,
+          type: 'assignment',
+          message: `You have been assigned a new workshop: "${workshop.workshopName}"`,
+          relatedItemId: docRef.id,
+          relatedItemType: 'workshop',
+          relatedClientId: workshop.clientId,
+          dateCreated: Date.now(),
+          read: false
+        });
+      }
+
       return { id: docRef.id, ...workshop } as Workshop;
     }
   },
@@ -385,45 +499,67 @@ const api = {
 
   // In a real app with Firebase Admin SDK, we would create the auth user here.
   // Client-side, we can only create a Firestore document to "whitelist" them.
-  // When they sign in, AuthContext matches the email.
   inviteUser: async (email: string, role: AppUser['role'], title: string, name: string): Promise<void> => {
-    // We use email as ID for the whitelist/placeholder if we don't have UID yet.
-    // BUT, AuthContext looks up by UID.
-    // Strategy: We can't easily "create" a user without them signing in or using Admin SDK.
-    // Alternative: We create a "whitelisted_users" collection or just rely on them signing up 
-    // and us editing them later. 
-    // BETTER: Create a document in 'users' with a generated ID (or email as ID if we change lookup logic, but that breaks current UID logic).
-    // COMPROMISE: We will just create a placeholder doc. Since we don't know the UID they will get from Google/Auth,
-    // we can't pre-populate the 'users/{uid}' doc.
-    // 
-    // REVISED STRATEGY for Client-Side Only:
-    // We cannot "invite" effectively without Admin SDK.
-    // We will stick to "Manage Existing Users" for now.
-    // If the user insists on "Invite", we can add a "whitelisted_emails" collection that AuthContext checks.
-    //
-    // Let's stick to updating/deleting EXISTING users for this step as per the prompt's "Manage roles" focus.
-    // I will add the functions but note the limitation.
-    // Actually, I'll implement a 'soft' invite where we just store a record that doesn't do much yet, 
-    // OR just skip 'invite' for this iteration and focus on managing the list.
-    //
-    // Let's implement 'deleteUser' (Firestore doc delete).
+    console.log("Invite user not implemented client-side", { email, role, title, name });
+  },
+
+  createUser: async (userData: { name: string; email: string; role: AppUser['role']; title: string }): Promise<void> => {
+    // Check if email already exists to prevent duplicates
+    const normalizedEmail = userData.email.toLowerCase();
+    const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      throw new Error("User with this email already exists.");
+    }
+
+    // Create a new document. AuthContext will migrate this to the correct UID upon first login.
+    await addDoc(collection(db, "users"), {
+      name: userData.name,
+      email: normalizedEmail,
+      role: userData.role,
+      title: userData.title,
+      createdAt: Date.now()
+    });
   },
 
   deleteUser: async (uid: string): Promise<void> => {
     await deleteDoc(doc(db, "users", uid));
   },
 
-  // --- Export Helpers ---
-  getAllCaseNotes: async (): Promise<CaseNote[]> => {
-    const q = query(collection(db, "caseNotes"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CaseNote));
-  },
+  mergeUserData: async (sourceUid: string, targetUid: string): Promise<{ clients: number, tasks: number, notes: number, workshops: number }> => {
+    console.log(`Merging data from ${sourceUid} to ${targetUid}`);
+    let counts = { clients: 0, tasks: 0, notes: 0, workshops: 0 };
 
-  getAllISPs: async (): Promise<ISP[]> => {
-    const q = query(collection(db, "isps"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ISP));
+    // 1. Migrate Clients (assignedAdminId, createdBy, lastModifiedBy)
+    const clientFields = ['metadata.assignedAdminId', 'metadata.createdBy', 'metadata.lastModifiedBy'];
+    for (const field of clientFields) {
+      const q = query(collection(db, "clients"), where(field, "==", sourceUid));
+      const snapshot = await getDocs(q);
+      counts.clients += snapshot.size;
+      const updates = snapshot.docs.map(doc => updateDoc(doc.ref, { [field]: targetUid }));
+      await Promise.all(updates);
+    }
+
+    // 2. Migrate Tasks
+    const tasksQuery = query(collection(db, "tasks"), where("assignedToId", "==", sourceUid));
+    const tasksSnapshot = await getDocs(tasksQuery);
+    counts.tasks += tasksSnapshot.size;
+    await Promise.all(tasksSnapshot.docs.map(doc => updateDoc(doc.ref, { assignedToId: targetUid })));
+
+    // 3. Migrate Case Notes
+    const notesQuery = query(collection(db, "caseNotes"), where("staffId", "==", sourceUid));
+    const notesSnapshot = await getDocs(notesQuery);
+    counts.notes += notesSnapshot.size;
+    await Promise.all(notesSnapshot.docs.map(doc => updateDoc(doc.ref, { staffId: targetUid })));
+
+    // 4. Migrate Workshops
+    const workshopsQuery = query(collection(db, "workshops"), where("assignedToId", "==", sourceUid));
+    const workshopsSnapshot = await getDocs(workshopsQuery);
+    counts.workshops += workshopsSnapshot.size;
+    await Promise.all(workshopsSnapshot.docs.map(doc => updateDoc(doc.ref, { assignedToId: targetUid })));
+
+    console.log("Merge completed:", counts);
+    return counts;
   },
 
   getTasks: async (): Promise<Task[]> => {
@@ -446,6 +582,193 @@ const api = {
       ...formData,
       submittedAt: Date.now()
     });
+  },
+
+  // --- Migration / Admin Utils ---
+  syncAllClientsLastCaseNoteDate: async (): Promise<number> => {
+    try {
+      const clientsCol = collection(db, "clients");
+      const clientSnapshot = await getDocs(clientsCol);
+      let updatedCount = 0;
+
+      console.log(`Starting sync for ${clientSnapshot.size} clients...`);
+
+      // Process in chunks to avoid overwhelming the browser/network if there are many
+      const clients = clientSnapshot.docs.map(doc => doc.id);
+
+      for (const clientId of clients) {
+        await updateClientLastCaseNoteDate(clientId);
+        updatedCount++;
+      }
+
+      console.log(`Sync completed. Updated ${updatedCount} clients.`);
+      return updatedCount;
+    } catch (error) {
+      console.error("Migration failed:", error);
+      throw error;
+    }
+  },
+
+  createBackup: async (): Promise<any> => {
+    const backup: any = {
+      timestamp: new Date().toISOString(),
+      details: "Full Firestore Backup",
+      data: {}
+    };
+
+    const collectionsToBackup = [
+      'clients',
+      'tasks',
+      'caseNotes',
+      'workshops',
+      'attachments',
+      'users',
+      'intakeForms',
+      'isps'
+    ];
+
+    try {
+      console.log("Starting Backup...");
+      for (const colName of collectionsToBackup) {
+        const colRef = collection(db, colName);
+        const snapshot = await getDocs(colRef);
+        backup.data[colName] = snapshot.docs.map(doc => ({
+          _id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`Backed up ${colName}: ${snapshot.size} docs`);
+      }
+      return backup;
+    } catch (error) {
+      console.error("Backup failed:", error);
+      throw error;
+    }
+  },
+
+  // --- AI Analysis Functions ---
+  getClientSummary: async (clientId: string): Promise<{ servicesProvided: string[], progressToGoals: string, lastUpdated?: any } | null> => {
+    const docRef = doc(db, "clientSummaries", clientId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as { servicesProvided: string[], progressToGoals: string, lastUpdated?: any };
+    }
+    return null;
+  },
+
+  analyzeClientProgress: async (clientId: string): Promise<{ servicesProvided: string[], progressToGoals: string }> => {
+    const analyzeFn = httpsCallable<{ clientId: string }, { servicesProvided: string[], progressToGoals: string }>(functions, 'analyzeClientProgress');
+    const result = await analyzeFn({ clientId });
+    return result.data;
+  },
+
+  // --- OCR Functions ---
+  extractFormData: async (file: File, formType: 'Intake' | 'ISP'): Promise<any> => {
+    // Convert file to Base64
+    const reader = new FileReader();
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          const base64String = (reader.result as string).split(',')[1];
+          const extractFn = httpsCallable(functions, 'extractFormDataFromPdf');
+          const result = await extractFn({
+            fileBase64: base64String,
+            mimeType: file.type,
+            formType
+          });
+          resolve(result.data);
+        } catch (error) {
+          console.error("OCR Error:", error);
+          reject(error);
+        }
+      };
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  },
+
+  // --- Summary Function ---
+  generateClientProgressSummary: async (clientId: string, timeRangeDays: number = 30, startDate?: string, endDate?: string): Promise<{ summary: string, caseNoteCount?: number, workshopCount?: number }> => {
+    const fn = httpsCallable(functions, 'generateClientProgressSummary');
+    const result = await fn({ clientId, timeRangeDays, startDate, endDate });
+    return result.data as { summary: string, caseNoteCount?: number, workshopCount?: number };
+  },
+
+  // --- Grant Report Helpers ---
+  getActiveClientsForRange: async (startDate: Date, endDate: Date): Promise<Client[]> => {
+    const startTimestamp = startDate.getTime();
+    const endTimestamp = endDate.getTime();
+    const activeClientIds = new Set<string>();
+
+    // 1. Check Case Notes
+    const notesQuery = query(
+      collection(db, "caseNotes"),
+      where("noteDate", ">=", startTimestamp),
+      where("noteDate", "<=", endTimestamp)
+    );
+    const notesSnap = await getDocs(notesQuery);
+    notesSnap.forEach(doc => activeClientIds.add(doc.data().clientId));
+
+    // 2. Check Workshops
+    const workshopsQuery = query(
+      collection(db, "workshops"),
+      where("workshopDate", ">=", startTimestamp),
+      where("workshopDate", "<=", endTimestamp)
+    );
+    const workshopsSnap = await getDocs(workshopsQuery);
+    workshopsSnap.forEach(doc => {
+      if (doc.data().status === 'Completed') {
+        activeClientIds.add(doc.data().clientId);
+      }
+    });
+
+    if (activeClientIds.size === 0) return [];
+
+    // 3. Fetch Client Details involved
+    // Firestore 'in' query supports max 10 items. We must batch.
+    const allIds = Array.from(activeClientIds);
+    const clientPromises = [];
+
+    // Simple approach: Fetch all clients and filter in memory? 
+    // Or fetch individually if list is large?
+    // Given the constraints and "Grant Admin" usage, fetching all clients is cached and fast enough usually.
+    // But let's do individual fetches or Batched 'in' queries. 
+    // Let's implement batching 10 at a time.
+
+    const BATCH_SIZE = 10;
+    const activeClients: Client[] = [];
+
+    for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+      const batchIds = allIds.slice(i, i + BATCH_SIZE);
+      const q = query(collection(db, "clients"), where(documentId(), "in", batchIds));
+      const snap = await getDocs(q);
+      snap.forEach(doc => activeClients.push({ id: doc.id, ...doc.data() } as Client));
+    }
+
+    // Sort by name
+    activeClients.sort((a, b) => {
+      const nameA = (a.profile?.firstName + a.profile?.lastName).toLowerCase();
+      const nameB = (b.profile?.firstName + b.profile?.lastName).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return activeClients;
+  },
+
+  // --- Notification Functions ---
+  getNotificationsByUserId: async (userId: string): Promise<Notification[]> => {
+    const q = query(collection(db, "notifications"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+    return notifications.sort((a, b) => b.dateCreated - a.dateCreated);
+  },
+
+  addNotification: async (notification: Omit<Notification, "id">): Promise<Notification> => {
+    const docRef = await addDoc(collection(db, "notifications"), sanitizeData(notification));
+    return { id: docRef.id, ...notification } as Notification;
+  },
+
+  deleteNotification: async (notificationId: string): Promise<void> => {
+    await deleteDoc(doc(db, "notifications", notificationId));
   },
 };
 

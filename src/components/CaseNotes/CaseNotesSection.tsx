@@ -18,7 +18,8 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
     const fetchNotes = useCallback(async () => {
         setLoading(true);
         const notesData = await api.getCaseNotesByClientId(clientId);
-        setNotes(notesData);
+        // Filter to only show 'Case Note' type, as 'Contact Note' has its own tab
+        setNotes(notesData.filter(n => n.noteType === 'Case Note'));
         setLoading(false);
     }, [clientId]);
 
@@ -33,7 +34,7 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
                     <div>
                         <h4 class="font-bold text-gray-800 text-lg">${note.noteType}</h4>
                         <div class="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                            <span>Date: ${new Date(note.noteDate).toLocaleString()}</span>
+                            <span>Date: ${new Date(note.noteDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}</span>
                             <span>By: ${note.staffName}</span>
                         </div>
                     </div>
@@ -101,6 +102,17 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
         fetchNotes();
     };
 
+    const handleDeleteNote = async (noteId: string) => {
+        try {
+            await api.deleteCaseNote(noteId);
+            // Refresh notes after delete to reflect changes (and update metadata if needed via the effect of fetch)
+            fetchNotes();
+        } catch (error) {
+            console.error("Failed to delete note:", error);
+            alert("Failed to delete note. Please try again.");
+        }
+    };
+
     if (loading) {
         return <div>Loading notes...</div>;
     }
@@ -138,6 +150,7 @@ const CaseNotesSection: React.FC<CaseNotesSectionProps> = ({ clientId, clientNam
                                         key={note.id}
                                         note={note}
                                         onEdit={handleStartEditing}
+                                        onDelete={handleDeleteNote}
                                         clientName={clientName}
                                     />
                                 ))}

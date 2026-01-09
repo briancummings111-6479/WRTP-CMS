@@ -33,6 +33,17 @@ const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
     supportServices: [],
 };
 
+const TableView = ({ headers, data, renderRow }: { headers: string[], data: any[], renderRow: (item: any) => React.ReactNode }) => (
+    <div className="overflow-x-auto">
+        <table className="min-w-full text-sm bg-white">
+            <thead className="bg-gray-100">
+                <tr>{headers.map(h => <th key={h} className="p-2 text-left font-semibold text-gray-600">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y">{data.map(renderRow)}</tbody>
+        </table>
+    </div>
+);
+
 const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => {
     const { user } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
@@ -46,7 +57,65 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         }
     }, [isEditing, isp]);
 
+    const [isProcessing, setIsProcessing] = useState(false);
 
+    // Auto-OCR Handler
+    const handleFileUploaded = async (file: File) => {
+        if (file.name.startsWith("2.1")) {
+            setIsProcessing(true);
+            try {
+                const extractedData = await api.extractFormData(file, 'ISP');
+
+                // 1. Update Local State
+                setFormData(prev => {
+                    const newData = {
+                        ...prev,
+                        ...extractedData,
+                        careerPlanning: { ...prev.careerPlanning, ...(extractedData.careerPlanning || {}) }
+                    };
+
+                    // 2. Auto-Save to Backend
+                    // Ensure we have all necessary fields for a valid ISP object
+                    // If creating new, generate ID. If updating, use existing.
+                    const ispId = isp?.id || crypto.randomUUID();
+
+                    const ispDataToSave = {
+                        ...defaultISPForm,
+                        ...isp,
+                        ...newData,
+                        clientId: clientId,
+                        id: ispId,
+                        // Ensure ISP Date is set
+                        ispDate: newData.ispDate || Date.now()
+                    } as ISP;
+
+                    api.upsertISP(ispDataToSave).then(() => {
+                        // Refresh logic handled by parent via onIspUpdate?
+                        // Actually onIspUpdate expects an ISP object and likely refreshes parent state
+                        onIspUpdate(ispDataToSave);
+                        alert(`ISP auto-filled and saved from ${file.name}`);
+                    }).catch(err => {
+                        console.error("Auto-save failed:", err);
+                        alert("Auto-fill worked but save failed: " + err.message);
+                    });
+
+                    return newData;
+                });
+
+                // If not editing, switch to edit mode to show changes? 
+                // Or just show them in the read-only view if they match?
+                // The read-only view relies on `isp` prop, which comes from parent.
+                // onIspUpdate should update the parent, which flows back down.
+                setIsEditing(true);
+
+            } catch (err: any) {
+                console.error("Failed to auto-fill ISP:", err);
+                alert("Failed to auto-fill: " + err.message);
+            } finally {
+                setIsProcessing(false);
+            }
+        }
+    };
     const handleEdit = () => setIsEditing(true);
     const handleCancel = () => {
         setIsEditing(false);
@@ -256,129 +325,201 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         }
     };
 
-    if (isEditing) {
-        return (
-            <Card title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"}>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="ispDate" className="label">ISP Date</label>
-                            <input
-                                type="date"
-                                id="ispDate"
-                                name="ispDate"
-                                value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
-                                onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
-                                className="form-input"
-                            />
-                        </div>
-                        <div><label htmlFor="jobDeveloper" className="label">Job Developer</label><input type="text" id="jobDeveloper" name="jobDeveloper" value={formData.jobDeveloper || ''} onChange={handleInputChange} className="form-input" /></div>
-                    </div>
-
-                    <fieldset><legend className="legend">Goals</legend>
-                        <div><label htmlFor="shortTermGoals" className="label">How can WRTP be of service to you? (1–3 month goals)</label><textarea id="shortTermGoals" name="shortTermGoals" value={formData.shortTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
-                        <div><label htmlFor="longTermGoals" className="label">Long-Term Goals (6−12+ months)</label><textarea id="longTermGoals" name="longTermGoals" value={formData.longTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
-                    </fieldset>
-
-                    <fieldset><legend className="legend">Identified Barriers/Needs</legend>
-                        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
-                    </fieldset>
-
-                    <fieldset><legend className="legend">Career Planning</legend>
-                        <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
-                        <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
-                    </fieldset>
-
-                    <fieldset><legend className="legend">Plan of Action - Who will do what and when?</legend>
-                        {(formData.planOfAction || []).map((item, index) => (
-                            <div key={item.id} className="p-2 border rounded-md space-y-2 mb-2">
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                                    <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2" />
-                                    <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2" />
-                                    <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input" />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                                    <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input" /></div>
-                                    <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input" /></div>
-                                    <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input" /></div>
-                                    <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5" /></button>
-                                </div>
-                            </div>
-                        ))}
-                        <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Action Item</button>
-                    </fieldset>
-
-                    <fieldset><legend className="legend">Support Services</legend>
-                        {(formData.supportServices || []).map((item, index) => (
-                            <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
-                                <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2" />
-                                <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input" /></div>
-                                <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3" />
-                                <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5" /></button>
-                            </div>
-                        ))}
-                        <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Referral</button>
-                    </fieldset>
-
-                    <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox" /><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
-
-                    <div className="flex justify-end pt-4 border-t"><button type="button" onClick={handleCancel} className="btn-secondary">Cancel</button><button type="submit" disabled={isSaving} className="btn-primary ml-3">{isSaving ? 'Saving...' : 'Save ISP'}</button></div>
-                </form>
-                <style>{`
-                    .label { display: block; margin-bottom: 0.25rem; font-medium; color: #374151; font-size: 0.875rem; }
-                    .legend { font-size: 1.125rem; font-medium: 600; color: #111827; margin-bottom: 0.5rem; }
-                    .form-input { display: block; width: 100%; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; }
-                    .form-input:focus { outline: none; border-color: #404E3B; box-shadow: 0 0 0 2px rgba(64, 78, 59, 0.3); }
-                    .form-checkbox { height: 1rem; width: 1rem; color: #404E3B; border-color: #D1D5DB; border-radius: 0.25rem; focus:ring-[#404E3B]; }
-                    .btn-primary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: white; background-color: #404E3B; }
-                    .btn-primary:hover { background-color: #5a6c53; } .btn-primary:disabled { background-color: #8d9b89; }
-                    .btn-secondary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: #374151; background-color: white; }
-                    .btn-secondary:hover { background-color: #F9FAFB; }
-                `}</style>
-            </Card>
-        );
-    }
-
-    if (!isp) {
-        return <div className="text-center py-10"><p className="text-gray-500 mb-4">No Individual Service Plan found for this client.</p>{user?.role === 'admin' && <button onClick={handleEdit} className="btn-primary">Create ISP</button>}</div>;
-    }
-
-    const TableView = ({ headers, data, renderRow }: { headers: string[], data: any[], renderRow: (item: any) => React.ReactNode }) => (
-        <div className="overflow-x-auto"><table className="min-w-full text-sm">
-            <thead className="bg-gray-100"><tr>{headers.map(h => <th key={h} className="p-2 text-left font-semibold text-gray-600">{h}</th>)}</tr></thead>
-            <tbody className="divide-y">{data.map(renderRow)}</tbody>
-        </table></div>
-    );
-
     return (
         <div className="space-y-6">
-            <Card title="Individual Service Plan" titleAction={
-                <div className="flex items-center space-x-2 no-print">
-                    <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>
-                    {user?.role === 'admin' && <button onClick={handleEdit} className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-[#404E3B] bg-[#E6E6E6] hover:bg-[#f2f2f2]"><Edit className="h-4 w-4 mr-2" />Edit ISP</button>}
-                </div>
-            }>
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><h4 className="font-semibold">ISP Date</h4><p>{new Date(isp.ispDate).toLocaleDateString()}</p></div>
-                        <div><h4 className="font-semibold">Job Developer</h4><p>{isp.jobDeveloper || 'N/A'}</p></div>
+            <AttachmentsSection clientId={clientId} category="ISP" showList={true} onFileUploaded={handleFileUploaded} />
+
+            {(isEditing || !isp) ? (
+                <Card title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"} titleAction={
+                    user?.role === 'admin' && (
+                        <label className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-white bg-[#404E3B] hover:bg-[#5a6c53] cursor-pointer">
+                            Auto-Fill (PDF)
+                            <input
+                                type="file"
+                                accept="application/pdf,image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        const file = e.target.files[0];
+                                        try {
+                                            const extractedData = await api.extractFormData(file, 'ISP');
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                ...extractedData,
+                                                careerPlanning: { ...prev.careerPlanning, ...(extractedData.careerPlanning || {}) }
+                                            }));
+                                            alert(`ISP populated from ${file.name}.`);
+                                        } catch (err: any) {
+                                            console.error("Failed to auto-fill ISP:", err);
+                                            alert("Failed to auto-fill: " + err.message);
+                                        }
+                                    }
+                                }}
+                            />
+                        </label>
+                    )
+                }>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="ispDate" className="label">ISP Date</label>
+                                <input
+                                    type="date"
+                                    id="ispDate"
+                                    name="ispDate"
+                                    value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
+                                    className="form-input"
+                                />
+                            </div>
+                            <div><label htmlFor="jobDeveloper" className="label">Job Developer</label><input type="text" id="jobDeveloper" name="jobDeveloper" value={formData.jobDeveloper || ''} onChange={handleInputChange} className="form-input" /></div>
+                        </div>
+
+                        <fieldset><legend className="legend">Goals</legend>
+                            <div><label htmlFor="shortTermGoals" className="label">How can WRTP be of service to you? (1–3 month goals)</label><textarea id="shortTermGoals" name="shortTermGoals" value={formData.shortTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
+                            <div><label htmlFor="longTermGoals" className="label">Long-Term Goals (6−12+ months)</label><textarea id="longTermGoals" name="longTermGoals" value={formData.longTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
+                        </fieldset>
+
+                        <fieldset><legend className="legend">Identified Barriers/Needs</legend>
+                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
+                        </fieldset>
+
+                        <fieldset><legend className="legend">Career Planning</legend>
+                            <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
+                            <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
+                        </fieldset>
+
+                        <fieldset><legend className="legend">Plan of Action - Who will do what and when?</legend>
+                            {(formData.planOfAction || []).map((item, index) => (
+                                <div key={item.id} className="p-2 border rounded-md space-y-2 mb-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                        <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                        <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                        <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input" />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                                        <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input" /></div>
+                                        <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input" /></div>
+                                        <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input" /></div>
+                                        <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5" /></button>
+                                    </div>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Action Item</button>
+                        </fieldset>
+
+                        <fieldset><legend className="legend">Support Services</legend>
+                            {(formData.supportServices || []).map((item, index) => (
+                                <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
+                                    <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2" />
+                                    <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input" /></div>
+                                    <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3" />
+                                    <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5" /></button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Referral</button>
+                        </fieldset>
+
+                        <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox" /><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
+
+                        <div className="flex justify-end pt-4 border-t">
+                            {isp && <button type="button" onClick={handleCancel} className="btn-secondary">Cancel</button>}
+                            <button type="submit" disabled={isSaving} className="btn-primary ml-3">{isSaving ? 'Saving...' : 'Save ISP'}</button>
+                        </div>
+                    </form>
+                    <style>{`
+                        .label { display: block; margin-bottom: 0.25rem; font-medium; color: #374151; font-size: 0.875rem; }
+                        .legend { font-size: 1.125rem; font-medium: 600; color: #111827; margin-bottom: 0.5rem; }
+                        .form-input { display: block; width: 100%; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; }
+                        .form-input:focus { outline: none; border-color: #404E3B; box-shadow: 0 0 0 2px rgba(64, 78, 59, 0.3); }
+                        .form-checkbox { height: 1rem; width: 1rem; color: #404E3B; border-color: #D1D5DB; border-radius: 0.25rem; focus:ring-[#404E3B]; }
+                        .btn-primary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: white; background-color: #404E3B; }
+                        .btn-primary:hover { background-color: #5a6c53; } .btn-primary:disabled { background-color: #8d9b89; }
+                        .btn-secondary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: #374151; background-color: white; }
+                        .btn-secondary:hover { background-color: #F9FAFB; }
+                    `}</style>
+                </Card>
+            ) : (
+                <Card title="Individual Service Plan" titleAction={
+                    <div className="flex items-center space-x-2 no-print">
+                        <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>
+                        {user?.role === 'admin' && (
+                            <button onClick={handleEdit} className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-[#404E3B] bg-[#E6E6E6] hover:bg-[#f2f2f2]"><Edit className="h-4 w-4 mr-2" />Edit ISP</button>
+                        )}
                     </div>
-                    <div><h4 className="font-semibold">Short-Term Goals (1-3 months)</h4><p className="whitespace-pre-wrap">{isp.shortTermGoals || 'N/A'}</p></div>
-                    <div><h4 className="font-semibold">Long-Term Goals (6-12+ months)</h4><p className="whitespace-pre-wrap">{isp.longTermGoals || 'N/A'}</p></div>
-                    <div><h4 className="font-semibold">Identified Barriers</h4>{isp.identifiedBarriers.length > 0 ? <ul className="list-disc list-inside"> {isp.identifiedBarriers.map(b => <li key={b}>{b}</li>)}</ul> : <p>No barriers identified.</p>}</div>
-                    <div><h4 className="font-semibold">Career Planning</h4><p>Workshops: {isp.careerPlanning.workshopsAssigned || 'None'}</p><p>Enrolled in CTE/College: {isp.careerPlanning.enrolledInCteOrCollege ? 'Yes' : 'No'}</p></div>
-                    <div><h4 className="font-semibold">Plan of Action</h4>
-                        <TableView headers={['Goal', 'Action', 'Responsible Party', 'Target Date', 'Review Date', 'Completion Date']} data={isp.planOfAction || []}
-                            renderRow={item => <tr key={item.id}><td className="p-2">{item.goal}</td><td className="p-2">{item.action}</td><td className="p-2">{item.responsibleParty}</td><td className="p-2">{item.targetDate}</td><td className="p-2">{item.reviewDate}</td><td className="p-2">{item.completionDate}</td></tr>} />
+                }>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <h4 className="font-semibold">ISP Date</h4>
+                                <p>{new Date(isp!.ispDate).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold">Job Developer</h4>
+                                <p>{isp!.jobDeveloper || 'N/A'}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Short-Term Goals (1-3 months)</h4>
+                            <p className="whitespace-pre-wrap">{isp!.shortTermGoals || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Long-Term Goals (6-12+ months)</h4>
+                            <p className="whitespace-pre-wrap">{isp!.longTermGoals || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Identified Barriers</h4>
+                            {isp!.identifiedBarriers.length > 0 ? (
+                                <ul className="list-disc list-inside">
+                                    {isp!.identifiedBarriers.map(b => <li key={b}>{b}</li>)}
+                                </ul>
+                            ) : (
+                                <p>No barriers identified.</p>
+                            )}
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Career Planning</h4>
+                            <p>Workshops: {isp!.careerPlanning.workshopsAssigned || 'None'}</p>
+                            <p>Enrolled in CTE/College: {isp!.careerPlanning.enrolledInCteOrCollege ? 'Yes' : 'No'}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Plan of Action</h4>
+                            <TableView
+                                headers={['Goal', 'Action', 'Responsible Party', 'Target Date', 'Review Date', 'Completion Date']}
+                                data={isp!.planOfAction || []}
+                                renderRow={item => (
+                                    <tr key={item.id}>
+                                        <td className="p-2">{item.goal}</td>
+                                        <td className="p-2">{item.action}</td>
+                                        <td className="p-2">{item.responsibleParty}</td>
+                                        <td className="p-2">{item.targetDate}</td>
+                                        <td className="p-2">{item.reviewDate}</td>
+                                        <td className="p-2">{item.completionDate}</td>
+                                    </tr>
+                                )}
+                            />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Support Services</h4>
+                            <TableView
+                                headers={['Agency', 'Referral Date', 'Outcome']}
+                                data={isp!.supportServices || []}
+                                renderRow={item => (
+                                    <tr key={item.id}>
+                                        <td className="p-2">{item.agency}</td>
+                                        <td className="p-2">{item.referralDate}</td>
+                                        <td className="p-2">{item.outcome}</td>
+                                    </tr>
+                                )}
+                            />
+                        </div>
+                        <div className="flex items-center pt-4 border-t">
+                            {isp!.acknowledgmentInitialed ? <CheckSquare className="h-5 w-5 text-green-600 mr-2" /> : <Square className="h-5 w-5 text-gray-400 mr-2" />}
+                            <span className="font-medium">Client has acknowledged this ISP.</span>
+                        </div>
                     </div>
-                    <div><h4 className="font-semibold">Support Services</h4>
-                        <TableView headers={['Agency', 'Referral Date', 'Outcome']} data={isp.supportServices || []}
-                            renderRow={item => <tr key={item.id}><td className="p-2">{item.agency}</td><td className="p-2">{item.referralDate}</td><td className="p-2">{item.outcome}</td></tr>} />
-                    </div>
-                    <div className="flex items-center pt-4 border-t">{isp.acknowledgmentInitialed ? <CheckSquare className="h-5 w-5 text-green-600 mr-2" /> : <Square className="h-5 w-5 text-gray-400 mr-2" />}<span className="font-medium">Client has acknowledged this ISP.</span></div>
-                </div>
-            </Card>
-            <AttachmentsSection clientId={clientId} category="ISP" showList={true} />
+                </Card>
+            )}
         </div>
     );
 };

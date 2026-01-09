@@ -10,9 +10,10 @@ interface AttachmentsSectionProps {
     clientId: string;
     showList?: boolean;
     category?: string; // Optional category filter
+    onFileUploaded?: (file: File) => void;
 }
 
-const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showList = true, category }) => {
+const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showList = true, category, onFileUploaded }) => {
     const { user } = useAuth();
     const [attachments, setAttachments] = useState<ClientAttachment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,6 +29,10 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
             const filteredData = category
                 ? data.filter(a => a.category === category)
                 : data;
+
+            // Sort alphabetically by fileName
+            filteredData.sort((a, b) => a.fileName.localeCompare(b.fileName));
+
             setAttachments(filteredData);
         } catch (error) {
             console.error("Failed to fetch attachments:", error);
@@ -48,57 +53,75 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
         fileInputRef.current?.click();
     };
 
-    const processFile = async (file: File) => {
-        if (!user) return;
+    const processFiles = async (files: File[]) => {
+        if (!user || files.length === 0) return;
         setUploading(true);
-        try {
-            // 1. Upload file to Storage with timeout
-            const uploadPromise = api.uploadClientFile(file, clientId);
-            const timeoutPromise = new Promise<string>((_, reject) =>
-                setTimeout(() => reject(new Error("Upload timed out")), 15000)
-            );
 
-            const downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+        let successCount = 0;
+        const errors: string[] = [];
 
-            // 2. Save metadata to Firestore
-            const newAttachment: ClientAttachment = {
-                id: crypto.randomUUID(), // Generate a unique ID
-                clientId,
-                fileName: file.name,
-                fileType: file.type || 'Unknown',
-                fileSize: file.size,
-                storageUrl: downloadUrl,
-                uploadedBy: user.name,
-                uploadDate: Date.now(),
-                category: category // Save with category if present
-            };
+        for (const file of files) {
+            try {
+                // 1. Upload file to Storage with timeout
+                const uploadPromise = api.uploadClientFile(file, clientId);
+                const timeoutPromise = new Promise<string>((_, reject) =>
+                    setTimeout(() => reject(new Error("Upload timed out")), 15000)
+                );
 
-            await api.addAttachment(newAttachment);
+                const downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
 
-            if (showList) {
-                await fetchAttachments(); // Refresh list
-            } else {
-                alert(`"${file.name}" uploaded successfully. View it in the 'Files' tab.`);
+                // 2. Save metadata to Firestore
+                const newAttachment: ClientAttachment = {
+                    id: crypto.randomUUID(), // Generate a unique ID
+                    clientId,
+                    fileName: file.name,
+                    fileType: file.type || 'Unknown',
+                    fileSize: file.size,
+                    storageUrl: downloadUrl,
+                    uploadedBy: user.name,
+                    uploadDate: Date.now(),
+                    category: category // Save with category if present
+                };
+
+                await api.addAttachment(newAttachment);
+                successCount++;
+
+                // Trigger callback if provided
+                if (onFileUploaded) {
+                    onFileUploaded(file);
+                }
+            } catch (error: any) {
+                console.error(`Failed to upload ${file.name}:`, error);
+                let errorMessage = `Failed to upload ${file.name}: `;
+                if (error.message === "Upload timed out") {
+                    errorMessage += "Upload timed out. Check CORS.";
+                } else if (error.code === 'storage/unauthorized') {
+                    errorMessage += "Unauthorized.";
+                } else {
+                    errorMessage += error.message || error;
+                }
+                errors.push(errorMessage);
             }
-        } catch (error: any) {
-            console.error("Failed to upload file:", error);
-            let errorMessage = "Upload failed. Please try again.";
-            if (error.message === "Upload timed out") {
-                errorMessage = "Upload timed out. This is often caused by CORS configuration on Firebase Storage when running locally. Please check your Firebase Console > Storage > Settings > CORS.";
-            } else if (error.code === 'storage/unauthorized') {
-                errorMessage = "Upload failed: Unauthorized. Check Firebase Storage rules.";
-            } else {
-                errorMessage = `Upload failed: ${error.message || error}`;
-            }
-            alert(errorMessage);
-        } finally {
-            setUploading(false);
         }
+
+        if (showList) {
+            await fetchAttachments(); // Refresh list
+        } else {
+            if (successCount > 0) {
+                alert(`${successCount} file(s) uploaded successfully. View in 'Files' tab.`);
+            }
+        }
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+        }
+
+        setUploading(false);
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            await processFile(e.target.files[0]);
+            await processFiles(Array.from(e.target.files));
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''; // Reset file input
             }
@@ -146,8 +169,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
         if (uploading || user?.role !== 'admin') return;
 
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            // Currently handling single file upload for simplicity, but could loop for multiple
-            await processFile(e.dataTransfer.files[0]);
+            await processFiles(Array.from(e.dataTransfer.files));
         }
     };
 
@@ -159,6 +181,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={uploading}
+                multiple
             />
             <button
                 onClick={handleUploadClick}
@@ -184,7 +207,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
                 {isDragging && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10 rounded-md pointer-events-none">
                         <FileUp className="h-12 w-12 text-blue-500 mb-2" />
-                        <p className="text-lg font-medium text-blue-600">Drop file to upload</p>
+                        <p className="text-lg font-medium text-blue-600">Drop files to upload</p>
                     </div>
                 )}
 

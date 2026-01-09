@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { CaseNote } from '../../types';
+import { CaseNote, ClientAttachment } from '../../types';
 import api from '../../lib/firebase';
 import { Bold, Italic, List } from 'lucide-react';
 import Card from '../Card';
@@ -30,8 +30,15 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     const [serviceType, setServiceType] = useState<CaseNote['serviceType']>('General Check-in');
     const [contactMethod, setContactMethod] = useState<CaseNote['contactMethod']>('Hartnell Office');
     const [durationMinutes, setDurationMinutes] = useState<number>(15);
-    const [attachments, setAttachments] = useState<{ fileName: string; storageUrl: string }[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [attachments, setAttachments] = useState<{ fileName: string; storageUrl: string }[]>([]); // Keep this for display/compat if needed, but we'll rebuild it
     const [submitting, setSubmitting] = useState(false);
+
+    // New state for Author dropdown
+    const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
+    const [selectedAuthorId, setSelectedAuthorId] = useState<string>('');
+    const [detectedMentions, setDetectedMentions] = useState<{ uid: string; name: string }[]>([]);
+
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,9 +50,31 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         setContactMethod('Hartnell Office');
         setDurationMinutes(15);
         setAttachments([]);
+        setSelectedFiles([]);
+        // Reset author to current user if available
+        if (user) setSelectedAuthorId(user.uid);
         if (editorRef.current) editorRef.current.innerHTML = '';
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
+
+    useEffect(() => {
+        const fetchStaff = async () => {
+            try {
+                const staff = await api.getStaffUsers();
+                setStaffMembers(staff.map(s => ({ uid: s.uid, name: s.name })));
+            } catch (error) {
+                console.error("Failed to fetch staff members", error);
+            }
+        };
+        fetchStaff();
+    }, []);
+
+    // Set default author when user loads
+    useEffect(() => {
+        if (user && !selectedAuthorId && !isEditing) {
+            setSelectedAuthorId(user.uid);
+        }
+    }, [user, selectedAuthorId, isEditing]);
 
     useEffect(() => {
         if (isEditing && noteToEdit) {
@@ -59,6 +88,10 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
             setContactMethod(noteToEdit.contactMethod);
             setDurationMinutes(noteToEdit.durationMinutes);
             setAttachments(noteToEdit.attachments || []);
+            // Set author from existing note
+            if (noteToEdit.staffId) {
+                setSelectedAuthorId(noteToEdit.staffId);
+            }
             if (editorRef.current) {
                 editorRef.current.innerHTML = noteToEdit.noteBody;
             }
@@ -77,26 +110,170 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         document.execCommand(command, false);
     };
 
+    const escapeRegExp = (string: string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    const parseMentions = (text: string) => {
+        if (!text) {
+            setDetectedMentions([]);
+            return;
+        }
+
+        const mentions = new Map<string, { uid: string; name: string }>();
+        const sortedStaff = [...staffMembers].sort((a, b) => b.name.length - a.name.length);
+
+        sortedStaff.forEach(staff => {
+            // Check Full Name
+            if (staff.name && new RegExp(`@${escapeRegExp(staff.name)}\\b`, 'i').test(text)) {
+                if (staff.uid !== user?.uid) mentions.set(staff.uid, staff);
+            } else {
+                // Check First Name (only if distinct and not already matched by full name logic implicitly? 
+                // Actually regex search for "Brian" matches "Brian Cummings" too.
+                // But we want to detect if the user typed ANY recognized name.
+                // So looping is fine.
+                const parts = staff.name.split(' ');
+                if (parts.length > 1 && parts[0].length > 1) {
+                    if (new RegExp(`@${escapeRegExp(parts[0])}\\b`, 'i').test(text)) {
+                        if (staff.uid !== user?.uid) mentions.set(staff.uid, staff);
+                    }
+                }
+            }
+        });
+
+        setDetectedMentions(Array.from(mentions.values()));
+    };
+
+    const handleInput = () => {
+        if (editorRef.current) {
+            // Use innerText for detection (strips HTML tags, handles &nbsp; as space usually)
+            // Note: innerText might not convert &nbsp; to space in all browsers, but usually does.
+            // Let's normalize just in case.
+            const text = editorRef.current.innerText.replace(/\u00a0/g, ' ');
+            parseMentions(text);
+        }
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            // FIX: Explicitly type `file` as `File` to resolve type inference issue.
-            const newFiles = Array.from(e.target.files).map((file: File) => ({
-                fileName: file.name,
-                storageUrl: `gs://chwrtp-files/caseNoteFiles/${clientId}/note_id_placeholder/${file.name}` // Mock URL
-            }));
-            setAttachments(prev => [...prev, ...newFiles]);
+            const files = Array.from(e.target.files);
+            setSelectedFiles(prev => [...prev, ...files]);
         }
+    };
+
+    // Remove file from selection
+    const removeFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const noteBody = editorRef.current?.innerHTML || '';
+        let noteBody = editorRef.current?.innerHTML || '';
         if (!noteBody.trim() || !user) return;
 
         setSubmitting(true);
 
         try {
             const timestamp = new Date(noteDate + 'T00:00:00').getTime();
+
+            // Find selected author details
+            const selectedAuthor = staffMembers.find(s => s.uid === selectedAuthorId) || { uid: user.uid, name: user.name };
+
+            // --- Mention Logic Start ---
+            const mentionedUserIds = new Set<string>();
+
+            // Helper to escape regex special characters
+            const escapeRegExp = (string: string) => {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            };
+
+            // 1. Build a list of matchable terms (Full Name and First Name)
+            // We verify that the name parts are valid (length > 1) to avoid matching single letters
+            let searchTerms: { term: string; staff: typeof staffMembers[0] }[] = [];
+            staffMembers.forEach(staff => {
+                // Add Full Name
+                if (staff.name) searchTerms.push({ term: staff.name, staff });
+
+                // Add First Name if distinct
+                const parts = staff.name.split(' ');
+                if (parts.length > 1 && parts[0].length > 1) {
+                    searchTerms.push({ term: parts[0], staff });
+                }
+            });
+
+            // 2. Sort by length descending to match "Brian Cummings" before "Brian"
+            searchTerms.sort((a, b) => b.term.length - a.term.length);
+
+            // 3. Tokenize replacement to avoid double-matching or matching inside replaced HTML
+            // Map token -> HTML replacement
+            const replacements = new Map<string, string>();
+            let tokenIndex = 0;
+
+            searchTerms.forEach(({ term, staff }) => {
+                // Regex: Match @Term with word boundary, case-insensitive
+                const pattern = new RegExp(`@${escapeRegExp(term)}\\b`, 'gi');
+
+                // We use a replace function to capture the actual matched text (preserving case if we wanted, 
+                // but we usually normalize to the Staff Name for the bold text).
+                // Actually, let's keep the user's casing but format it? 
+                // Or standardized to @StaffName? Standardized is cleaner.
+
+                // We only replace if it's NOT already part of a token (unlikely due to unique token format)
+                // noteBody is mutated in this loop.
+                const token = `__MENTION_TOKEN_${tokenIndex++}__`;
+
+                let foundMatch = false;
+                noteBody = noteBody.replace(pattern, (match) => {
+                    foundMatch = true;
+                    replacements.set(token, `<b>@${staff.name}</b>`);
+                    return token;
+                });
+
+                if (foundMatch && staff.uid !== user.uid) {
+                    mentionedUserIds.add(staff.uid);
+                }
+            });
+
+            // 4. Swap tokens back to HTML
+            replacements.forEach((html, token) => {
+                noteBody = noteBody.split(token).join(html);
+            });
+            // --- Mention Logic End ---
+
+            // Handle File Uploads
+            const uploadedAttachments: { fileName: string; storageUrl: string }[] = [...attachments]; // Start with existing attachments if editing
+
+            for (const file of selectedFiles) {
+                try {
+                    // 1. Upload file
+                    const downloadUrl = await api.uploadClientFile(file, clientId);
+
+                    // 2. Create Attachment Metadata Record
+                    const newAttachment = {
+                        id: crypto.randomUUID(),
+                        clientId,
+                        fileName: file.name,
+                        fileType: file.type || 'Unknown',
+                        fileSize: file.size,
+                        storageUrl: downloadUrl,
+                        uploadedBy: user.name,
+                        uploadDate: Date.now(),
+                        category: 'Case Note' // Tag as Case Note attachment
+                    };
+                    await api.addAttachment(newAttachment);
+
+                    // 3. Add to note's attachment list
+                    uploadedAttachments.push({
+                        fileName: file.name,
+                        storageUrl: downloadUrl
+                    });
+
+                } catch (uploadError) {
+                    console.error(`Failed to upload file ${file.name}`, uploadError);
+                    alert(`Failed to upload ${file.name}. Note will be saved without this file.`);
+                }
+            }
+
             if (isEditing && noteToEdit) {
                 const updatedNote: CaseNote = {
                     ...noteToEdit,
@@ -106,17 +283,17 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     contactMethod,
                     durationMinutes,
                     noteBody,
-                    attachments,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    attachments: uploadedAttachments,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                 };
                 await api.updateCaseNote(updatedNote);
             } else {
                 const newNoteData = {
                     clientId,
-                    staffId: user.uid,
-                    staffName: user.name,
+                    staffId: selectedAuthor.uid,
+                    staffName: selectedAuthor.name,
                     noteDate: timestamp,
                     noteType,
                     urgency,
@@ -124,10 +301,44 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     contactMethod,
                     durationMinutes,
                     noteBody,
-                    attachments,
+                    attachments: uploadedAttachments,
                 };
                 await api.addCaseNote(newNoteData);
             }
+
+            // --- Send Notifications ---
+            if (mentionedUserIds.size > 0) {
+                // Get Client Name for the message (optimistic: we don't have it in props, but we can try generic or fetch it)
+                // Actually we only have clientId. The notification message should ideally say the client name.
+                // We can fetch client or just say "a client".
+                // Let's try to pass clientName if possible, or fetch it.
+                // For now, "a client" is safe, or we use a quick fetch if we had client info.
+                // Wait, this component is likely used inside CaseNotesSection which might know the client name?
+                // No, it just receives clientId.
+                // Checking imports... CaseNotesSection might have it.
+                // Let's fetch it quickly or just say "a client". 
+                // Actually, to make it nice, let's fetch the client name once on mount or use a generic message.
+                // Optimization: Let's assume generic "a note" or fetch.
+                // Let's fetch client details in a useEffect to have the name ready for notification.
+            }
+            // For the sake of this edit, I can't add a useEffect easily without replacing the whole component.
+            // I'll do the fetch inside the submit or just use "a client".
+            // Since `api` functions are available, I'll do a quick fetch inside logic if I really want the name.
+            // But let's keep it simple: "mentioned you in a note."
+
+            for (const mentionedUid of mentionedUserIds) {
+                await api.addNotification({
+                    userId: mentionedUid,
+                    type: 'mention',
+                    message: `${selectedAuthor.name} mentioned you in a case note.`,
+                    relatedItemId: clientId, // Use ClientID so clicking goes to the client 
+                    relatedItemType: 'case_note', // Maps to client view
+                    relatedClientId: clientId,
+                    dateCreated: Date.now(),
+                    read: false
+                });
+            }
+
             resetForm();
             onSave();
         } catch (error) {
@@ -141,20 +352,29 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     return (
         <Card title={isEditing ? 'Edit Case Note' : 'Add New Case Note'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     {/* Note Date */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Note Date</label>
                         <input type="date" value={noteDate} onChange={e => setNoteDate(e.target.value)} className="form-input" required />
                     </div>
-                    {/* Note Type */}
+                    {/* Author */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Note Type</label>
-                        <select value={noteType} onChange={e => setNoteType(e.target.value as CaseNote['noteType'])} className="form-input">
-                            <option>Case Note</option>
-                            <option>Contact Note</option>
+                        <label className="block text-sm font-medium text-gray-700">Author</label>
+                        <select
+                            value={selectedAuthorId}
+                            onChange={e => setSelectedAuthorId(e.target.value)}
+                            className="form-input"
+                        >
+                            {staffMembers.map(member => (
+                                <option key={member.uid} value={member.uid}>
+                                    {member.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
+                    {/* Note Type - REMOVED */}
+
                     {/* Urgency */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Urgency</label>
@@ -178,7 +398,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </div>
                     {/* Contact Method */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Contact Method</label>
+                        <label className="block text-sm font-medium text-gray-700">Method</label>
                         <select value={contactMethod} onChange={e => setContactMethod(e.target.value as CaseNote['contactMethod'])} className="form-input">
                             <option>Hartnell Office</option>
                             <option>CHYBA Office</option>
@@ -203,6 +423,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                         <div
                             ref={editorRef}
                             contentEditable
+                            onInput={handleInput}
                             className="p-3 min-h-[120px] focus:outline-none"
                             aria-label="Note body editor"
                         ></div>
@@ -210,7 +431,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                 </div>
 
                 {/* Duration and Attachments */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Duration (Minutes)</label>
                         <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(parseInt(e.target.value, 10))} className="form-input" min="0" />
@@ -221,11 +442,45 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     </div>
                 </div>
 
-                {attachments.length > 0 && (
+                {/* Detected Mentions Feedback */}
+                {detectedMentions.length > 0 && (
+                    <div className="flex items-center space-x-2 text-sm text-[#404E3B] bg-green-50 p-2 rounded-md border border-green-100">
+                        <span className="font-semibold">Mentions to notify:</span>
+                        <div className="flex flex-wrap gap-2">
+                            {detectedMentions.map(u => (
+                                <span key={u.uid} className="bg-white px-2 py-0.5 rounded shadow-sm text-xs border border-green-200">
+                                    @{u.name}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Display Selected Files (Pending Upload) */}
+                {selectedFiles.length > 0 && (
                     <div className="text-sm text-gray-600">
-                        <p className="font-medium">Selected files:</p>
+                        <p className="font-medium">Files to upload:</p>
                         <ul className="list-disc list-inside">
-                            {attachments.map((file, i) => <li key={i}>{file.fileName}</li>)}
+                            {selectedFiles.map((file, i) => (
+                                <li key={i} className="flex justify-between items-center">
+                                    <span>{file.name}</span>
+                                    <button type="button" onClick={() => removeFile(i)} className="text-red-500 hover:text-red-700 text-xs ml-2">Remove</button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Display Existing Attachments (If modifying) */}
+                {attachments.length > 0 && (
+                    <div className="text-sm text-gray-600 mt-2">
+                        <p className="font-medium">Attached files:</p>
+                        <ul className="list-disc list-inside">
+                            {attachments.map((file, i) => (
+                                <li key={i}>
+                                    <a href={file.storageUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{file.fileName}</a>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 )}

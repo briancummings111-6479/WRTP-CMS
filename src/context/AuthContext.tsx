@@ -11,7 +11,7 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, query, where, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { STAFF_ROLES } from '../config/staff';
 
 interface AuthContextType {
@@ -32,70 +32,150 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        const email = firebaseUser.email || '';
+      console.log("AuthContext: onAuthStateChanged triggered", firebaseUser ? firebaseUser.uid : "No user");
+      try {
+        if (firebaseUser) {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          const email = firebaseUser.email || '';
+          console.log(`AuthContext: Checking user doc for ${firebaseUser.uid} (email: ${email}). Exists: ${userDocSnap.exists()}`);
 
-        // Check if this user is in our pre-defined staff list (for initial bootstrap only)
-        const staffConfig = STAFF_ROLES.find(s => s.email.toLowerCase() === email.toLowerCase());
+          // Check if this user is in our pre-defined staff list (for initial bootstrap only)
+          const staffConfig = STAFF_ROLES.find(s => s.email.toLowerCase() === email.toLowerCase());
 
-        let appUser: AppUser;
+          let appUser: AppUser;
 
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            console.log("AuthContext: User found in Firestore", userData);
 
-          // Check if we need to update the user's role/title based on config (Bootstrap/Override)
-          // This ensures that if we change roles in staff.ts, they propagate to Firestore on next login
-          if (staffConfig && (userData.role !== staffConfig.role || userData.title !== staffConfig.title)) {
-            await setDoc(userDocRef, {
-              ...userData,
-              role: staffConfig.role,
-              title: staffConfig.title
-            }, { merge: true });
+            // Check if we need to update the user's role/title based on config (Bootstrap/Override)
+            // This ensures that if we change roles in staff.ts, they propagate to Firestore on next login
+            if (staffConfig && (userData.role !== staffConfig.role || userData.title !== staffConfig.title)) {
+              console.log("AuthContext: Updating staff role/title from config");
+              await setDoc(userDocRef, {
+                ...userData,
+                role: staffConfig.role,
+                title: staffConfig.title
+              }, { merge: true });
 
-            appUser = {
-              uid: firebaseUser.uid,
-              name: userData.name || firebaseUser.displayName || 'Unknown User',
-              email: email,
-              role: staffConfig.role as UserRole,
-              title: staffConfig.title
-            };
+              appUser = {
+                uid: firebaseUser.uid,
+                name: userData.name || firebaseUser.displayName || 'Unknown User',
+                email: email,
+                role: staffConfig.role as UserRole,
+                title: staffConfig.title
+              };
+            } else {
+              // Use Firestore data as the source of truth
+              appUser = {
+                uid: firebaseUser.uid,
+                name: userData.name || firebaseUser.displayName || 'Unknown User',
+                email: email,
+                role: userData.role as UserRole || 'viewer',
+                title: userData.title
+              };
+            }
           } else {
-            // Use Firestore data as the source of truth
-            appUser = {
-              uid: firebaseUser.uid,
-              name: userData.name || firebaseUser.displayName || 'Unknown User',
-              email: email,
-              role: userData.role as UserRole || 'viewer',
-              title: userData.title
-            };
-          }
-        } else {
-          // New user - check staff config for bootstrap, otherwise default to viewer/pending
-          appUser = {
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || staffConfig?.name || 'Unknown User',
-            email: email,
-            role: (staffConfig?.role as UserRole) || 'viewer',
-            title: staffConfig?.title
-          };
+            console.log("AuthContext: User doc not found. Checking for legacy record...");
+            // User document does not exist for this UID.
+            // Check if there is a legacy user record with the same email but different ID.
+            const q = query(collection(db, 'users'), where('email', '==', email));
+            const querySnapshot = await getDocs(q);
 
-          await setDoc(userDocRef, {
-            name: appUser.name,
-            email: appUser.email,
-            role: appUser.role,
-            title: appUser.title || null,
-            createdAt: Date.now()
-          });
+            if (!querySnapshot.empty) {
+              // Found a legacy record! Migrate it.
+              const legacyDoc = querySnapshot.docs[0];
+              const legacyData = legacyDoc.data();
+              const legacyId = legacyDoc.id;
+              console.log(`AuthContext: Found legacy user record ${legacyId} for email ${email}. Migrating to ${firebaseUser.uid}.`);
+
+              // Helper to migrate collection
+              const migrateCollection = async (collectionName: string, field: string) => {
+                const q = query(collection(db, collectionName), where(field, '==', legacyId));
+                const snapshot = await getDocs(q);
+                console.log(`AuthContext: Migrating ${snapshot.size} documents in ${collectionName} (field: ${field})`);
+                const updates = snapshot.docs.map(doc => updateDoc(doc.ref, { [field]: firebaseUser.uid }));
+                await Promise.all(updates);
+              };
+
+              try {
+                await Promise.all([
+                  migrateCollection('clients', 'metadata.assignedAdminId'),
+                  migrateCollection('clients', 'metadata.createdBy'),
+                  migrateCollection('clients', 'metadata.lastModifiedBy'),
+                  migrateCollection('tasks', 'assignedToId'),
+                  migrateCollection('caseNotes', 'staffId'),
+                  migrateCollection('workshops', 'assignedToId')
+                ]);
+                console.log("AuthContext: Data migration completed.");
+              } catch (err) {
+                console.error("AuthContext: Data migration failed", err);
+              }
+              // We continue to create the new user even if migration fails partially
+
+              // Use legacy data, but update role/title if staff config exists
+              appUser = {
+                uid: firebaseUser.uid,
+                name: legacyData.name || firebaseUser.displayName || staffConfig?.name || 'Unknown User',
+                email: email,
+                role: (staffConfig?.role || legacyData.role) as UserRole || 'viewer',
+                title: staffConfig?.title || legacyData.title
+              };
+
+              // Create new doc with correct UID
+              console.log("AuthContext: Creating new user doc", appUser);
+              await setDoc(userDocRef, {
+                ...legacyData, // Keep other fields like createdAt if they exist
+                name: appUser.name,
+                email: appUser.email,
+                role: appUser.role,
+                title: appUser.title || null,
+                migratedFrom: legacyDoc.id, // Audit trail
+                migratedAt: Date.now()
+              });
+
+              // Delete the old duplicate record
+              try {
+                console.log("AuthContext: Deleting legacy doc", legacyId);
+                await deleteDoc(doc(db, 'users', legacyDoc.id));
+              } catch (deleteErr) {
+                console.error("AuthContext: Failed to delete legacy doc", deleteErr);
+                // Do not block login if deletion fails
+              }
+
+            } else {
+              console.log("AuthContext: No legacy record found. Creating new user.");
+              // New user - check staff config for bootstrap, otherwise default to viewer/pending
+              appUser = {
+                uid: firebaseUser.uid,
+                name: firebaseUser.displayName || staffConfig?.name || 'Unknown User',
+                email: email,
+                role: (staffConfig?.role as UserRole) || 'viewer',
+                title: staffConfig?.title
+              };
+
+              await setDoc(userDocRef, {
+                name: appUser.name,
+                email: appUser.email,
+                role: appUser.role,
+                title: appUser.title || null,
+                createdAt: Date.now()
+              });
+            }
+          }
+          console.log("AuthContext: User set successfully", appUser);
+          setUser(appUser);
+        } else {
+          console.log("AuthContext: No user");
+          setUser(null);
         }
-        console.log("AuthContext: User set", appUser);
-        setUser(appUser);
-      } else {
-        console.log("AuthContext: No user");
+      } catch (error) {
+        console.error("AuthContext: Error in onAuthStateChanged", error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

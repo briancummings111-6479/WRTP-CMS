@@ -19,13 +19,7 @@ export interface AuditChecklistItem {
   notes: string;
 }
 
-export interface AuditChecklist {
-  onboarding: AuditChecklistItem[];
-  isp: AuditChecklistItem[];
-  caseNotes: AuditChecklistItem[];
-  workshops: AuditChecklistItem[];
-  misc: AuditChecklistItem[];
-}
+export type AuditChecklist = AuditChecklistItem[];
 // ---------------------------------
 
 // Demographics Interface
@@ -178,7 +172,7 @@ export interface Client {
     createdBy: string; // UID
     lastModified: number; // Timestamp
     lastModifiedBy: string; // UID
-    status: 'Prospect' | 'Active' | 'Inactive';
+    status: 'Prospect' | 'Applicant' | 'Active' | 'Inactive';
     clientType: 'General Population' | 'CHYBA';
     assignedAdminId?: string; // UID
     assignedAdminName?: string;
@@ -192,8 +186,8 @@ export interface Client {
 // Task Data Model
 export interface Task {
   id: string;
-  clientId: string;
-  clientName: string;
+  clientId?: string;
+  clientName?: string;
   assignedToId: string; // UID
   assignedToName: string;
   createdBy: string; // Name
@@ -203,6 +197,8 @@ export interface Task {
   status: 'Open' | 'In Progress' | 'Waiting' | 'Completed';
   linkTo: string | null;
   urgency: 'Green' | 'Yellow' | 'Red';
+  serviceType?: 'Job Search' | 'Supportive Service' | 'Training' | 'Intake Meeting' | 'ISP Review' | 'General Check-in';
+  dateCreated?: number; // Timestamp
 }
 
 // Case Note Model
@@ -294,8 +290,21 @@ export interface Workshop {
   // --- FIX: Added 'Resume Building' to the type ---
   workshopName: 'Career Explorations' | 'Job Preparedness' | 'Interview Success' | 'Financial Literacy' | 'Entrepreneurship' | 'Resume Building' | 'Other';
   workshopNameOther?: string;
-  status: 'Scheduled' | 'In Progress' | 'Declined' | 'Completed' | 'No Show';
+  status: 'Scheduled' | 'In Progress' | 'Completed' | 'Canceled' | 'Declined' | 'No Show' | 'On Hold';
   assignedToId: string; // UID of staff
   assignedToName: string;
   associatedTaskId?: string; // ID of the task created for this workshop
+}
+
+// Notification Model
+export interface Notification {
+  id: string;
+  userId: string; // The user receiving the notification
+  type: 'assignment' | 'mention';
+  message: string;
+  relatedItemId?: string; // ID of the Task, Workshop, or Client (for case notes)
+  relatedItemType: 'task' | 'workshop' | 'case_note';
+  relatedClientId?: string;
+  dateCreated: number;
+  read: boolean;
 }

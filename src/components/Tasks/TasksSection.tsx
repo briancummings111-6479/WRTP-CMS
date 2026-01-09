@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import Card from '../Card';
 import TaskItem from './TaskItem';
 import AddEditTaskModal from './AddEditTaskModal';
-import { Plus } from 'lucide-react';
+import { Plus, List, ChevronUp } from 'lucide-react';
 
 interface TasksSectionProps {
   clientId: string;
@@ -19,6 +19,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchTasksAndAdmins = useCallback(async () => {
     setLoading(true);
@@ -27,7 +28,19 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         api.getTasksByClientId(clientId),
         api.getStaffUsers()
       ]);
-      setTasks(tasksData.filter(t => t.status !== 'Completed').sort((a, b) => a.dueDate - b.dueDate));
+      // Custom sort: Active tasks first, then by dateCreated descending
+      const sortedTasks = tasksData.sort((a, b) => {
+        const aIsActive = a.status !== 'Completed';
+        const bIsActive = b.status !== 'Completed';
+
+        if (aIsActive && !bIsActive) return -1;
+        if (!aIsActive && bIsActive) return 1;
+
+        // If status priority is same, sort by dateCreated (newest first)
+        // Fallback to 0 if dateCreated is missing
+        return (b.dateCreated || 0) - (a.dateCreated || 0);
+      });
+      setTasks(sortedTasks);
       setAdmins(staffData.map((s: AppUser) => ({ id: s.uid, name: s.name })));
     } catch (error) {
       console.error("Failed to fetch tasks or admins:", error);
@@ -79,17 +92,29 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
   return (
     <>
       <Card
-        title="Client's To-Do Tasks"
+        title="Client's Tasks"
         titleAction={
-          user?.role === 'admin' && (
-            <button
-              onClick={() => handleOpenModal()}
-              className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
-              aria-label="Add new task"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          )
+          <div className="flex items-center gap-2">
+            {tasks.length > 2 && (
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="inline-flex items-center px-2 py-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+                aria-label={showAll ? "Show fewer tasks" : "Show all tasks"}
+                title={showAll ? "Show fewer" : "Show all"}
+              >
+                {showAll ? <ChevronUp className="h-4 w-4" /> : <List className="h-4 w-4" />}
+              </button>
+            )}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => handleOpenModal()}
+                className="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none"
+                aria-label="Add new task"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         }
       >
         {loading ? (
@@ -97,7 +122,7 @@ const TasksSection: React.FC<TasksSectionProps> = ({ clientId, clientName }) => 
         ) : (
           <div className="space-y-3">
             {tasks.length > 0 ? (
-              tasks.map(task => (
+              (showAll ? tasks : tasks.slice(0, 2)).map(task => (
                 <TaskItem
                   key={task.id}
                   task={task}
