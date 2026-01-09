@@ -465,6 +465,13 @@ const ClientDashboardPage: React.FC = () => {
     { key: 'entrepreneurshipCTE', label: 'Entrepreneurship CTE' },
   ];
 
+  const workDocumentsMap: { key: TrainingBooleanKeys, label: string }[] = [
+    { key: 'cteStudentContract', label: 'CTE Student Contract' },
+    { key: 'workPermit', label: 'Work Permit' },
+    { key: 'resume', label: 'Resume' },
+    { key: 'coverLetter', label: 'Cover Letter' },
+  ];
+
   if (loading) return <div>Loading client data...</div>;
   if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
   if (!client) return <div className="p-4">Client not found (ID: {clientId})</div>;
@@ -763,6 +770,19 @@ const ClientDashboardPage: React.FC = () => {
                               )}
                             </div>
                           </div>
+
+                          <hr className="border-gray-200" />
+
+                          <div>
+                            <h4 className="text-md font-medium text-gray-800 mb-2">Work Documents</h4>
+                            <div className="space-y-2">
+                              {workDocumentsMap.filter(doc => trainingData[doc.key]).length > 0 ? (
+                                workDocumentsMap.map(doc =>
+                                  trainingData[doc.key] && <DisplayListItem key={doc.key} label={doc.label} />
+                                )
+                              ) : <p className="text-sm text-gray-500">No work documents on file.</p>}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -821,12 +841,26 @@ const ClientDashboardPage: React.FC = () => {
                                 value={trainingData.otherCteProgram || ''}
                                 onChange={handleTrainingChange}
                                 className="form-input mt-1"
-                                placeholder="e.g., IT, Media"
+                                placeholder="e.g., Welding"
                               />
                             </div>
                           </fieldset>
 
-                          {/* Save/Cancel Buttons */}
+                          {/* Work Documents Section */}
+                          <fieldset className="space-y-4 p-4 border rounded-md">
+                            <legend className="text-md font-medium text-gray-700 px-1">Work Documents</legend>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              {workDocumentsMap.map(doc => (
+                                <CheckboxInput
+                                  key={doc.key}
+                                  label={doc.label}
+                                  name={doc.key}
+                                  checked={Boolean(trainingData && trainingData[doc.key])}
+                                  onChange={handleTrainingChange}
+                                />
+                              ))}
+                            </div>
+                          </fieldset>
                         </div>
                       </form>
                     )}

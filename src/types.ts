@@ -163,6 +163,11 @@ export interface Client {
     earlyChildhoodEducationCTE: boolean; // Added
     entrepreneurshipCTE: boolean; // Added
     otherCteProgram?: string;
+    // Work Documents
+    cteStudentContract?: boolean;
+    workPermit?: boolean;
+    resume?: boolean;
+    coverLetter?: boolean;
   };
 
   demographics?: Demographics;
