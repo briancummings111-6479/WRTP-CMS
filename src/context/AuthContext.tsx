@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
-            console.log("AuthContext: User found in Firestore", userData);
+            console.log("DEBUG_V2: User found in Firestore. Role in DB:", userData.role, "Title in DB:", userData.title);
 
             // Check if we need to update the user's role/title based on config (Bootstrap/Override)
             // This ensures that if we change roles in staff.ts, they propagate to Firestore on next login
@@ -116,13 +116,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
               // We continue to create the new user even if migration fails partially
 
-              // Use legacy data, but update role/title if staff config exists
+              // Use legacy data, but prefer legacy DB value over config
+              const roleToUse = (legacyData.role || staffConfig?.role) as UserRole || 'viewer';
+              const titleToUse = legacyData.title || staffConfig?.title;
+              console.log(`DEBUG_V2: Legacy Migration. Using Role: ${roleToUse} (Legacy: ${legacyData.role}, Config: ${staffConfig?.role})`);
+
               appUser = {
                 uid: firebaseUser.uid,
                 name: legacyData.name || firebaseUser.displayName || staffConfig?.name || 'Unknown User',
                 email: email,
-                role: (staffConfig?.role || legacyData.role) as UserRole || 'viewer',
-                title: staffConfig?.title || legacyData.title
+                role: roleToUse,
+                title: titleToUse
               };
 
               // Create new doc with correct UID
