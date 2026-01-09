@@ -40,7 +40,7 @@ const UrgencyBadge: React.FC<{ urgency: CaseNote['urgency'] }> = ({ urgency }) =
 
 const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, onDelete, clientName }) => {
     const { user } = useAuth();
-    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff' || (user?.role === 'viewer' && user?.title !== 'Applicant');
 
     const handleDelete = () => {
         // Use a simple confirm for now. The parent handles the actual API call.

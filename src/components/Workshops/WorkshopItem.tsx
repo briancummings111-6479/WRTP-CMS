@@ -28,7 +28,7 @@ const StatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
 
 const WorkshopItem: React.FC<WorkshopItemProps> = ({ workshop, onEdit, onDelete }) => {
     const { user } = useAuth();
-    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff' || (user?.role === 'viewer' && user?.title !== 'Applicant');
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();

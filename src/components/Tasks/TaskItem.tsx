@@ -55,7 +55,7 @@ const StatusBadge: React.FC<{ status: Task['status'] }> = ({ status }) => {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotification }) => {
     const { user } = useAuth();
-    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff' || (user?.role === 'viewer' && user?.title !== 'Applicant');
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();

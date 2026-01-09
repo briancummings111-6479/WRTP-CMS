@@ -16,7 +16,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
   const [formData, setFormData] = useState<Client>(client);
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuth();
-  const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
+  const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff' || (user?.role === 'viewer' && user?.title !== 'Applicant');
 
   useEffect(() => {
     setFormData(client);
