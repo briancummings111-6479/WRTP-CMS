@@ -51,6 +51,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // Check if we need to update the user's role/title based on config (Bootstrap/Override)
             // This ensures that if we change roles in staff.ts, they propagate to Firestore on next login
+            /* DISABLED: This prevents manual role changes from persisting.
             if (staffConfig && (userData.role !== staffConfig.role || userData.title !== staffConfig.title)) {
               console.log("AuthContext: Updating staff role/title from config");
               await setDoc(userDocRef, {
@@ -67,15 +68,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 title: staffConfig.title
               };
             } else {
-              // Use Firestore data as the source of truth
-              appUser = {
-                uid: firebaseUser.uid,
-                name: userData.name || firebaseUser.displayName || 'Unknown User',
-                email: email,
-                role: userData.role as UserRole || 'viewer',
-                title: userData.title
-              };
-            }
+            */
+            // Use Firestore data as the source of truth
+            appUser = {
+              uid: firebaseUser.uid,
+              name: userData.name || firebaseUser.displayName || 'Unknown User',
+              email: email,
+              role: userData.role as UserRole || 'viewer',
+              title: userData.title
+            };
+            // }
           } else {
             console.log("AuthContext: User doc not found. Checking for legacy record...");
             // User document does not exist for this UID.
