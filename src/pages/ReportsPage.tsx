@@ -5,6 +5,7 @@ import { Client, Workshop, CaseNote } from '../types';
 import Card from '../components/Card';
 import { Printer } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 
 const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
     const statusStyles: { [key in Workshop['status']]: string } = {
@@ -24,15 +25,38 @@ const WorkshopStatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status 
 };
 
 const ReportsPage: React.FC = () => {
+    const { user } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [workshops, setWorkshops] = useState<Workshop[]>([]);
     const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
     const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'population' | 'encounters' | 'barriers' | 'workshopMatrix' | 'workshopAttendance' | 'narrative'>('population');
     const [workshopFilter, setWorkshopFilter] = useState('All');
     const [selectedCaseManager, setSelectedCaseManager] = useState('All');
     const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
     const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>('All');
+
+    // Narrative Report State - Restored
+    const [reportMonth, setReportMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [apiKey, setApiKey] = useState<string>('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generatedReport, setGeneratedReport] = useState<string>('');
+    const [reportError, setReportError] = useState<string>('');
+
+    useEffect(() => {
+        const storedKey = localStorage.getItem('gemini_api_key');
+        if (storedKey) setApiKey(storedKey);
+    }, []);
+
+    useEffect(() => {
+        if (apiKey) {
+            localStorage.setItem('gemini_api_key', apiKey);
+        }
+    }, [apiKey]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -644,6 +668,93 @@ const ReportsPage: React.FC = () => {
         }
     };
 
+    const generateNarrativeReport = async () => {
+        if (!apiKey) {
+            setReportError('Please enter a valid Google Gemini API Key.');
+            return;
+        }
+        setReportError('');
+        setIsGenerating(true);
+        setGeneratedReport('');
+
+        try {
+            const [yearStr, monthStr] = reportMonth.split('-');
+            const year = parseInt(yearStr);
+            const month = parseInt(monthStr) - 1;
+
+            const startDate = new Date(year, month, 1);
+            const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+            const startTimestamp = startDate.getTime();
+            const endTimestamp = endDate.getTime();
+
+            const narrativeContext = {
+                month: startDate.toLocaleString('default', { month: 'long' }),
+                year: year,
+                overview: {
+                    activeClients: reportData.activeCount,
+                    totalEncounters: 0, // Calculated below based on date range
+                    newIntakesCount: 0,
+                },
+                newIntakes: [] as string[],
+                workshops: [] as any[],
+                clientProgress: [] as string[]
+            };
+
+            // Filter New Intakes
+            clients.forEach(client => {
+                if (client.metadata.dateCreated >= startTimestamp && client.metadata.dateCreated <= endTimestamp) {
+                    narrativeContext.newIntakes.push(`${client.profile.firstName} ${client.profile.lastName}`);
+                }
+            });
+            narrativeContext.overview.newIntakesCount = narrativeContext.newIntakes.length;
+
+            // Filter Workshops
+            const filteredWorkshops = workshops.filter(ws =>
+                ws.workshopDate >= startTimestamp &&
+                ws.workshopDate <= endTimestamp &&
+                ws.status === 'Completed'
+            );
+
+            narrativeContext.workshops = filteredWorkshops.map(ws => {
+                const client = clients.find(c => c.id === ws.clientId);
+                return {
+                    date: new Date(ws.workshopDate).toLocaleDateString(),
+                    topic: ws.workshopName === 'Other' ? ws.workshopNameOther : ws.workshopName,
+                    attendee: client ? `${client.profile.firstName} ${client.profile.lastName}` : 'Unknown Client'
+                };
+            });
+
+            // Filter Case Notes
+            const filteredNotes = caseNotes.filter(note =>
+                note.noteDate >= startTimestamp &&
+                note.noteDate <= endTimestamp
+            );
+            narrativeContext.overview.totalEncounters = filteredNotes.length + filteredWorkshops.length;
+
+            filteredNotes.forEach(note => {
+                const client = clients.find(c => c.id === note.clientId);
+                if (client) {
+                    const cleanBody = note.noteBody.replace(/<[^>]*>?/gm, '');
+                    narrativeContext.clientProgress.push(`Client: ${client.profile.firstName} ${client.profile.lastName} - Note Type: ${note.noteType} - Note: ${cleanBody}`);
+                }
+            });
+
+            const contextString = JSON.stringify(narrativeContext, null, 2);
+
+            const { generateMonthlyReport } = await import('../lib/gemini');
+
+            const report = await generateMonthlyReport(apiKey, startDate.toLocaleString('default', { month: 'long' }), year.toString(), contextString);
+            setGeneratedReport(report);
+
+        } catch (err: any) {
+            console.error(err);
+            setReportError('Failed to generate report: ' + (err.message || 'Unknown error'));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     if (loading) {
         return <div>Loading report data...</div>;
     }
@@ -675,341 +786,468 @@ const ReportsPage: React.FC = () => {
                 </div>
             </div>
 
-
-
-            <Card
-                title="Client Population Report"
-                className="no-print"
-                titleAction={
+            {/* Tab Navigation */}
+            <div className="flex space-x-2 mb-6 no-print">
+                <button
+                    onClick={() => setActiveTab('population')}
+                    className={`px-4 py-2 rounded-md ${activeTab === 'population' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    Client Population
+                </button>
+                <button
+                    onClick={() => setActiveTab('encounters')}
+                    className={`px-4 py-2 rounded-md ${activeTab === 'encounters' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    Encounters
+                </button>
+                <button
+                    onClick={() => setActiveTab('barriers')}
+                    className={`px-4 py-2 rounded-md ${activeTab === 'barriers' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    Barriers Report
+                </button>
+                <button
+                    onClick={() => setActiveTab('workshopMatrix')}
+                    className={`px-4 py-2 rounded-md ${activeTab === 'workshopMatrix' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    Workshop Matrix
+                </button>
+                <button
+                    onClick={() => setActiveTab('workshopAttendance')}
+                    className={`px-4 py-2 rounded-md ${activeTab === 'workshopAttendance' ? 'bg-[#98B0A9] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    Workshop Attendance
+                </button>
+                {/* NEW: Narrative Report Tab - Admin Only */}
+                {user?.role === 'admin' && (
                     <button
-                        onClick={handlePrintClientReport}
-                        className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                        onClick={() => setActiveTab('narrative')}
+                        className={`px-4 py-2 rounded-md flex items-center gap-2 ${activeTab === 'narrative' ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                     >
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print Report
+                        <span className="text-xs">✨</span> AI Narrative
                     </button>
-                }
-            >
-                {/* Section 1: Overall Breakdown */}
-                <div className="border-b border-gray-200 pb-4 mb-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">Overall Breakdown</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
-                        <div>
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span class="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span class="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
-                            <p className="text-3xl font-bold text-gray-800">{reportData.totalIndividuals}</p>
-                        </div>
-                    </div>
-                </div>
+                )}
+            </div>
 
-                {/* Section 2: Enrolled Client Details */}
-                <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-3">Enrolled Client Details <span className="font-normal text-gray-500">({reportData.enrolledClientsCount} total)</span></h3>
-                    {reportData.enrolledClientsCount > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Sub-section: By Type */}
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                <h4 className="font-semibold text-gray-800 mb-2">By Type</h4>
-                                <ul className="space-y-2 text-sm">
-                                    <StatListItem label="General Population" value={reportData.generalPopulationCount} percentage={reportData.generalPopulationPercentage} />
-                                    <StatListItem label="CHYBA" value={reportData.chybaCount} percentage={reportData.chybaPercentage} />
-                                </ul>
-                            </div>
-                            {/* Sub-section: By Status */}
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                <h4 className="font-semibold text-gray-800 mb-2">By Status</h4>
-                                <ul className="space-y-2 text-sm">
-                                    <StatListItem label="Active" value={reportData.activeCount} percentage={reportData.activePercentage} />
-                                    <StatListItem label="Inactive" value={reportData.inactiveCount} percentage={reportData.inactivePercentage} />
-                                </ul>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-center text-gray-500 py-6">No enrolled clients to analyze.</p>
-                    )}
-                </div>
-            </Card>
+            {activeTab === 'narrative' && user?.role === 'admin' && (
+                <Card
+                    title="Narrative Report Generator"
+                    className="no-print border-purple-200"
+                    titleAction={<span className="text-xl">✨</span>}
+                >
+                    <div className="bg-purple-50 p-4 rounded-lg mb-6 border border-purple-100">
+                        <p className="text-sm text-purple-800">
+                            Use Google Gemini AI to generate a narrative monthly report for the City of Redding.
+                            This tool analyzes client intakes, workshops, and case notes for the selected month.
+                        </p>
+                    </div>
 
-            <Card
-                title="Encounters Report"
-                className="no-print"
-                titleAction={
-                    <div className="flex items-center space-x-2">
-                        <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
-                        <select
-                            id="encountersMonthFilter"
-                            value={encountersMonthFilter}
-                            onChange={(e) => setEncountersMonthFilter(e.target.value)}
-                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                        >
-                            <option value="All">All Months</option>
-                            {encountersReportData.availableMonths.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                }
-            >
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-8">
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.totalEncounters}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.caseNotesCount}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.contactNotesCount}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border">
-                        <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops Delivered</p>
-                        <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.workshopsCount}</p>
-                    </div>
-                </div>
-
-                <div className="h-[400px] w-full mt-8">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Encounters Trend</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                            data={encountersReportData.graphData}
-                            margin={{
-                                top: 20,
-                                right: 30,
-                                left: 20,
-                                bottom: 30,
-                            }}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip
-                                cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Report Month</label>
+                            <input
+                                type="month"
+                                value={reportMonth}
+                                onChange={(e) => setReportMonth(e.target.value)}
+                                className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
                             />
-                            <Legend />
-                            <Bar dataKey="caseNotes" name="Case Notes" stackId="a" fill="#4D7C7B" />
-                            <Bar dataKey="workshops" name="Workshops Delivered" stackId="a" fill="#9CB072" />
-                            <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#6B7280" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </Card>
-
-            {/* Barriers to Employment Report */}
-            <Card
-                title="Barriers to Employment"
-                className="no-print"
-                titleAction={
-                    <button
-                        onClick={handlePrintBarriersReport}
-                        className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print Report
-                    </button>
-                }
-            >
-                <div className="mb-4">
-                    <p className="text-sm text-gray-500">Analysis based on <span className="font-semibold text-gray-700">{barriersReportData.totalActive} Active</span> clients.</p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Chart Area */}
-                    <div className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                layout="vertical"
-                                data={barriersReportData.data}
-                                margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                <XAxis type="number" unit="%" />
-                                <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
-                                <Tooltip
-                                    cursor={{ fill: 'transparent' }}
-                                    formatter={(value: number) => [`${value.toFixed(1)}%`, 'Percentage']}
-                                />
-                                <Legend />
-                                <Bar dataKey="genPopPercentage" name="Gen Pop %" fill="#4D7C7B" />
-                                <Bar dataKey="chybaPercentage" name="CHYBA %" fill="#E6A532" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    {/* Table Area */}
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th scope="col" className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Barrier</th>
-                                    <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Gen Pop</th>
-                                    <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">CHYBA</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {barriersReportData.data.map((barrier) => (
-                                    <tr key={barrier.name}>
-                                        <td className="px-3 py-2 font-medium text-gray-900">{barrier.name}</td>
-                                        <td className="px-3 py-2 text-center">
-                                            <div className="text-gray-900 font-semibold">{barrier.genPopCount}</div>
-                                            <div className="text-xs text-gray-500">{barrier.genPopPercentage.toFixed(1)}%</div>
-                                        </td>
-                                        <td className="px-3 py-2 text-center">
-                                            <div className="text-gray-900 font-semibold">{barrier.chybaCount}</div>
-                                            <div className="text-xs text-gray-500">{barrier.chybaPercentage.toFixed(1)}%</div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </Card>
-
-            <Card
-                title="Workshop Matrix Report"
-                titleAction={
-                    <div className="flex items-center space-x-2">
-                        <label htmlFor="matrixStatusFilter" className="text-sm font-medium text-gray-700">Filter Status:</label>
-                        <select
-                            id="matrixStatusFilter"
-                            value={matrixStatusFilter}
-                            onChange={(e) => setMatrixStatusFilter(e.target.value)}
-                            className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                        >
-                            <option value="All">All Statuses</option>
-                            <option value="Scheduled">Scheduled</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Declined">Declined</option>
-                            <option value="No Show">No Show</option>
-                            <option value="Blank">Not Enrolled (Blank)</option>
-                        </select>
-                    </div>
-                }
-            >
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
-                                    Client Name
-                                </th>
-                                {workshopMatrixData.allWorkshopNames.map(name => (
-                                    <th key={name} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                                        {name}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {workshopMatrixData.matrix.map(({ client, workshopStatusMap }) => (
-                                <tr key={client.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 border-r">
-                                        <Link to={`/clients/${client.id}`} className="text-[#404E3B] hover:underline">
-                                            {client.profile.firstName} {client.profile.lastName}
-                                        </Link>
-                                    </td>
-                                    {workshopMatrixData.allWorkshopNames.map(name => (
-                                        <td key={name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {workshopStatusMap[name] ? (
-                                                <WorkshopStatusBadge status={workshopStatusMap[name]} />
-                                            ) : (
-                                                <span className="text-gray-300">-</span>
-                                            )}
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))}
-                            {workshopMatrixData.matrix.length === 0 && (
-                                <tr>
-                                    <td colSpan={workshopMatrixData.allWorkshopNames.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
-                                        No clients found matching the criteria.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </Card>
-
-            <Card
-                title="Workshop Attendance List"
-                className="printable-card"
-                titleAction={
-                    <div className="relative z-10 flex items-center space-x-4 no-print">
-                        <div>
-                            <label htmlFor="workshopFilter" className="sr-only">Filter by workshop</label>
-                            <select
-                                id="workshopFilter"
-                                value={workshopFilter}
-                                onChange={e => setWorkshopFilter(e.target.value)}
-                                className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
-                            >
-                                <option value="All">All Workshops</option>
-                                {workshopReportData.workshopNames.map(name => <option key={name} value={name}>{name}</option>)}
-                            </select>
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Google Gemini API Key</label>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="AIza..."
+                                className="w-full px-3 py-2 border rounded-md focus:ring-purple-500 focus:border-purple-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Get key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">Google AI Studio</a></p>
+                        </div>
+                    </div>
+
+                    {reportError && (
+                        <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4 text-sm border border-red-200">
+                            {reportError}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={generateNarrativeReport}
+                        disabled={isGenerating}
+                        className={`w-full py-3 rounded-md font-medium text-white transition-all
+                        ${isGenerating
+                                ? 'bg-purple-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md transform active:scale-[0.99]'
+                            }`}
+                    >
+                        {isGenerating ? 'Generating Report...' : 'Generate Narrative Report'}
+                    </button>
+
+                    {generatedReport && (
+                        <div className="mt-8 border-t pt-6 animation-fade-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-lg font-semibold text-gray-900">Generated Report</h4>
+                                <button
+                                    onClick={() => navigator.clipboard.writeText(generatedReport)}
+                                    className="text-sm text-purple-600 hover:text-purple-800 font-medium px-3 py-1 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+                                >
+                                    Copy to Clipboard
+                                </button>
+                            </div>
+                            <div className="bg-gray-50 p-6 rounded-md border border-gray-200 prose max-w-none whitespace-pre-wrap font-serif leading-relaxed text-gray-800">
+                                {generatedReport}
+                            </div>
+                        </div>
+                    )}
+                </Card>
+            )}
+
+            {/* Client Population Report */}
+            {activeTab === 'population' && (
+                <Card
+                    title="Client Population Report"
+                    className="no-print"
+                    titleAction={
                         <button
-                            onClick={handlePrintWorkshopReport}
+                            onClick={handlePrintClientReport}
                             className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                         >
                             <Printer className="h-4 w-4 mr-2" />
                             Print Report
                         </button>
-                    </div>
-                }
-            >
-                <div id="workshop-report-printable" className="space-y-8">
-                    {workshopReportData.workshopNames.filter(name => workshopFilter === 'All' || name === workshopFilter).map(workshopName => (
-                        <div key={workshopName} className="break-inside-avoid">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">{workshopName}</h3>
-                            <div className="overflow-x-auto border rounded-lg">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workshop Date</th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Staff</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {workshopReportData.groupedWorkshops[workshopName].map(entry => (
-                                            <tr key={entry.id}>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <Link to={`/clients/${entry.clientId}`} className="text-sm font-medium text-[#404E3B] hover:underline">
-                                                        {entry.clientName}
-                                                    </Link>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <WorkshopStatusBadge status={entry.status} />
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    {new Date(entry.workshopDate).toLocaleDateString()}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.assignedToName}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    }
+                >
+                    {/* Section 1: Overall Breakdown */}
+                    <div className="border-b border-gray-200 pb-4 mb-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Overall Breakdown</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
+                            <div>
+                                <p className="text-sm text-gray-500 uppercase tracking-wide">Prospects</p>
+                                <p className="text-3xl font-bold text-gray-800">{reportData.prospectsCount} <span className="text-lg font-normal text-gray-600">({reportData.prospectsPercentage.toFixed(1)}%)</span></p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500 uppercase tracking-wide">Enrolled Clients</p>
+                                <p className="text-3xl font-bold text-gray-800">{reportData.enrolledClientsCount} <span className="text-lg font-normal text-gray-600">({reportData.enrolledClientsPercentage.toFixed(1)}%)</span></p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500 uppercase tracking-wide">Total Individuals</p>
+                                <p className="text-3xl font-bold text-gray-800">{reportData.totalIndividuals}</p>
                             </div>
                         </div>
-                    ))}
-                    {workshopReportData.workshopNames.length === 0 && !loading && (
-                        <p className="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>
-                    )}
-                </div>
-            </Card>
+                    </div>
+
+                    {/* Section 2: Enrolled Client Details */}
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Enrolled Client Details <span className="font-normal text-gray-500">({reportData.enrolledClientsCount} total)</span></h3>
+                        {reportData.enrolledClientsCount > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Sub-section: By Type */}
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                    <h4 className="font-semibold text-gray-800 mb-2">By Type</h4>
+                                    <ul className="space-y-2 text-sm">
+                                        <StatListItem label="General Population" value={reportData.generalPopulationCount} percentage={reportData.generalPopulationPercentage} />
+                                        <StatListItem label="CHYBA" value={reportData.chybaCount} percentage={reportData.chybaPercentage} />
+                                    </ul>
+                                </div>
+                                {/* Sub-section: By Status */}
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                    <h4 className="font-semibold text-gray-800 mb-2">By Status</h4>
+                                    <ul className="space-y-2 text-sm">
+                                        <StatListItem label="Active" value={reportData.activeCount} percentage={reportData.activePercentage} />
+                                        <StatListItem label="Inactive" value={reportData.inactiveCount} percentage={reportData.inactivePercentage} />
+                                    </ul>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-center text-gray-500 py-6">No enrolled clients to analyze.</p>
+                        )}
+                    </div>
+                </Card>
+            )}
+
+            {/* Encounters Report */}
+            {activeTab === 'encounters' && (
+                <Card
+                    title="Encounters Report"
+                    className="no-print"
+                    titleAction={
+                        <div className="flex items-center space-x-2">
+                            <label htmlFor="encountersMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
+                            <select
+                                id="encountersMonthFilter"
+                                value={encountersMonthFilter}
+                                onChange={(e) => setEncountersMonthFilter(e.target.value)}
+                                className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                            >
+                                <option value="All">All Months</option>
+                                {encountersReportData.availableMonths.map(m => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    }
+                >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-8">
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
+                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.totalEncounters}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Case Notes</p>
+                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.caseNotesCount}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Contact Notes</p>
+                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.contactNotesCount}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Workshops Delivered</p>
+                            <p className="text-3xl font-bold text-gray-800">{encountersReportData.stats.workshopsCount}</p>
+                        </div>
+                    </div>
+
+                    <div className="h-[400px] w-full mt-8">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Encounters Trend</h3>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                layout="vertical"
+                                data={encountersReportData.graphData}
+                                margin={{
+                                    top: 20,
+                                    right: 30,
+                                    left: 20,
+                                    bottom: 30,
+                                }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                />
+                                <Legend />
+                                <Bar dataKey="caseNotes" name="Case Notes" stackId="a" fill="#4D7C7B" />
+                                <Bar dataKey="workshops" name="Workshops Delivered" stackId="a" fill="#9CB072" />
+                                <Bar dataKey="contactNotes" name="Contact Notes" stackId="a" fill="#6B7280" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+            )}
+
+            {/* Barriers to Employment Report */}
+            {activeTab === 'barriers' && (
+                <Card
+                    title="Barriers to Employment"
+                    className="no-print"
+                    titleAction={
+                        <button
+                            onClick={handlePrintBarriersReport}
+                            className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print Report
+                        </button>
+                    }
+                >
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-500">Analysis based on <span className="font-semibold text-gray-700">{barriersReportData.totalActive} Active</span> clients.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Chart Area */}
+                        <div className="h-[400px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    layout="vertical"
+                                    data={barriersReportData.data}
+                                    margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                    <XAxis type="number" unit="%" />
+                                    <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
+                                    <Tooltip
+                                        cursor={{ fill: 'transparent' }}
+                                        formatter={(value: number) => [`${value.toFixed(1)}%`, 'Percentage']}
+                                    />
+                                    <Legend />
+                                    <Bar dataKey="genPopPercentage" name="Gen Pop %" fill="#4D7C7B" />
+                                    <Bar dataKey="chybaPercentage" name="CHYBA %" fill="#E6A532" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Table Area */}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" className="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Barrier</th>
+                                        <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Gen Pop</th>
+                                        <th scope="col" className="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">CHYBA</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {barriersReportData.data.map((barrier) => (
+                                        <tr key={barrier.name}>
+                                            <td className="px-3 py-2 font-medium text-gray-900">{barrier.name}</td>
+                                            <td className="px-3 py-2 text-center">
+                                                <div className="text-gray-900 font-semibold">{barrier.genPopCount}</div>
+                                                <div className="text-xs text-gray-500">{barrier.genPopPercentage.toFixed(1)}%</div>
+                                            </td>
+                                            <td className="px-3 py-2 text-center">
+                                                <div className="text-gray-900 font-semibold">{barrier.chybaCount}</div>
+                                                <div className="text-xs text-gray-500">{barrier.chybaPercentage.toFixed(1)}%</div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
+            {activeTab === 'workshopMatrix' && (
+                <Card
+                    title="Workshop Matrix Report"
+                    titleAction={
+                        <div className="flex items-center space-x-2">
+                            <label htmlFor="matrixStatusFilter" className="text-sm font-medium text-gray-700">Filter Status:</label>
+                            <select
+                                id="matrixStatusFilter"
+                                value={matrixStatusFilter}
+                                onChange={(e) => setMatrixStatusFilter(e.target.value)}
+                                className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                            >
+                                <option value="All">All Statuses</option>
+                                <option value="Scheduled">Scheduled</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Declined">Declined</option>
+                                <option value="No Show">No Show</option>
+                                <option value="Blank">Not Enrolled (Blank)</option>
+                            </select>
+                        </div>
+                    }
+                >
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
+                                        Client Name
+                                    </th>
+                                    {workshopMatrixData.allWorkshopNames.map(name => (
+                                        <th key={name} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                                            {name}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {workshopMatrixData.matrix.map(({ client, workshopStatusMap }) => (
+                                    <tr key={client.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10 border-r">
+                                            <Link to={`/clients/${client.id}`} className="text-[#404E3B] hover:underline">
+                                                {client.profile.firstName} {client.profile.lastName}
+                                            </Link>
+                                        </td>
+                                        {workshopMatrixData.allWorkshopNames.map(name => (
+                                            <td key={name} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {workshopStatusMap[name] ? (
+                                                    <WorkshopStatusBadge status={workshopStatusMap[name]} />
+                                                ) : (
+                                                    <span className="text-gray-300">-</span>
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                                {workshopMatrixData.matrix.length === 0 && (
+                                    <tr>
+                                        <td colSpan={workshopMatrixData.allWorkshopNames.length + 1} className="px-6 py-4 text-center text-sm text-gray-500">
+                                            No clients found matching the criteria.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            {activeTab === 'workshopAttendance' && (
+                <Card
+                    title="Workshop Attendance List"
+                    className="printable-card"
+                    titleAction={
+                        <div className="relative z-10 flex items-center space-x-4 no-print">
+                            <div>
+                                <label htmlFor="workshopFilter" className="sr-only">Filter by workshop</label>
+                                <select
+                                    id="workshopFilter"
+                                    value={workshopFilter}
+                                    onChange={e => setWorkshopFilter(e.target.value)}
+                                    className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                                >
+                                    <option value="All">All Workshops</option>
+                                    {workshopReportData.workshopNames.map(name => <option key={name} value={name}>{name}</option>)}
+                                </select>
+                            </div>
+                            <button
+                                onClick={handlePrintWorkshopReport}
+                                className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Report
+                            </button>
+                        </div>
+                    }
+                >
+                    <div id="workshop-report-printable" className="space-y-8">
+                        {workshopReportData.workshopNames.filter(name => workshopFilter === 'All' || name === workshopFilter).map(workshopName => (
+                            <div key={workshopName} className="break-inside-avoid">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3">{workshopName}</h3>
+                                <div className="overflow-x-auto border rounded-lg">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Workshop Date</th>
+                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Staff</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {workshopReportData.groupedWorkshops[workshopName].map(entry => (
+                                                <tr key={entry.id}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <Link to={`/clients/${entry.clientId}`} className="text-sm font-medium text-[#404E3B] hover:underline">
+                                                            {entry.clientName}
+                                                        </Link>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <WorkshopStatusBadge status={entry.status} />
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        {new Date(entry.workshopDate).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.assignedToName}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))}
+                        {workshopReportData.workshopNames.length === 0 && !loading && (
+                            <p className="text-center text-gray-500 py-10">No workshop data available to generate a report.</p>
+                        )}
+                    </div>
+                </Card>
+            )}
         </div>
     );
 };
