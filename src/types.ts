@@ -1,5 +1,5 @@
 // User and Auth
-export type UserRole = 'admin' | 'viewer' | 'pending';
+export type UserRole = 'admin' | 'staff' | 'viewer' | 'pending';
 
 export interface User {
   uid: string;

@@ -55,7 +55,7 @@ const StatusBadge: React.FC<{ status: Task['status'] }> = ({ status }) => {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotification }) => {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -89,7 +89,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onEdit, onDelete, hasNotifica
                             <Link className="h-4 w-4" />
                         </a>
                     )}
-                    {isAdmin && (
+                    {isStaffOrAdmin && (
                         <>
                             <button onClick={(e) => { e.stopPropagation(); onEdit(task); }} className="text-gray-400 hover:text-[#404E3B]" aria-label="Edit task"><Edit className="h-4 w-4" /></button>
                             <button onClick={handleDelete} className="text-gray-400 hover:text-red-600" aria-label="Delete task"><Trash2 className="h-4 w-4" /></button>

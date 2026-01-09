@@ -10,7 +10,7 @@ const location = 'us-central1';
 const vertexAI = new VertexAI({ project, location });
 const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-export const queryKnowledgeBase = onCall({ timeoutSeconds: 60, memory: "1GiB" }, async (request) => {
+export const queryKnowledgeBase = onCall({ timeoutSeconds: 120, memory: "2GiB" }, async (request) => {
     // 1. Authentication Check
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');

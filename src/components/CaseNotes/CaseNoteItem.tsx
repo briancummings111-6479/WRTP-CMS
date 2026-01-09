@@ -40,7 +40,7 @@ const UrgencyBadge: React.FC<{ urgency: CaseNote['urgency'] }> = ({ urgency }) =
 
 const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, onDelete, clientName }) => {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
 
     const handleDelete = () => {
         // Use a simple confirm for now. The parent handles the actual API call.
@@ -126,7 +126,7 @@ const CaseNoteItem: React.FC<CaseNoteItemProps> = ({ note, onEdit, onDelete, cli
                 </div>
                 <div className="flex items-center space-x-3">
                     <UrgencyBadge urgency={note.urgency} />
-                    {isAdmin && (
+                    {isStaffOrAdmin && (
                         <>
                             <button onClick={() => onEdit(note)} className="text-gray-400 hover:text-[#404E3B] no-print" aria-label="Edit note">
                                 <Edit className="w-5 h-5" />

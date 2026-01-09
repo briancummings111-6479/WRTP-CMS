@@ -28,7 +28,7 @@ const StatusBadge: React.FC<{ status: Workshop['status'] }> = ({ status }) => {
 
 const WorkshopItem: React.FC<WorkshopItemProps> = ({ workshop, onEdit, onDelete }) => {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
+    const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -44,7 +44,7 @@ const WorkshopItem: React.FC<WorkshopItemProps> = ({ workshop, onEdit, onDelete 
         <div className="p-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
             <div className="flex justify-between items-start">
                 <p className="text-sm font-medium text-gray-800 flex-1 pr-2">{workshopDisplayName}</p>
-                {isAdmin && (
+                {isStaffOrAdmin && (
                     <div className="flex-shrink-0 flex items-center space-x-2">
                         <button onClick={(e) => { e.stopPropagation(); onEdit(workshop); }} className="text-gray-400 hover:text-[#404E3B]" aria-label="Edit workshop"><Edit className="h-4 w-4" /></button>
                         <button onClick={handleDelete} className="text-gray-400 hover:text-red-600" aria-label="Delete workshop"><Trash2 className="h-4 w-4" /></button>

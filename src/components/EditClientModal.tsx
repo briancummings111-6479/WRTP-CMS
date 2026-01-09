@@ -16,7 +16,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
   const [formData, setFormData] = useState<Client>(client);
   const [isSaving, setIsSaving] = useState(false);
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isStaffOrAdmin = user?.role === 'admin' || user?.role === 'staff';
 
   useEffect(() => {
     setFormData(client);
@@ -178,7 +178,7 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
           </div>
           <div className="flex justify-between items-center p-4 border-t bg-gray-50 sticky bottom-0">
             <div>
-              {isAdmin && onDelete && (
+              {isStaffOrAdmin && onDelete && (
                 <button
                   type="button"
                   onClick={handleDelete}

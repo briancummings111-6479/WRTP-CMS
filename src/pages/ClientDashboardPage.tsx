@@ -525,15 +525,7 @@ const ClientDashboardPage: React.FC = () => {
           <div className="flex items-center gap-2">
             {client.metadata.status !== 'Prospect' && <ClientTypeBadge clientType={metadata.clientType} />}
             <StatusBadge status={metadata.status} />
-            {user?.title === 'Administrator' && (
-              <button
-                onClick={() => setIsSummaryModalOpen(true)}
-                className="inline-flex items-center px-3 py-1.5 border border-[#404E3B] rounded-md shadow-sm text-sm font-medium text-[#404E3B] bg-white hover:bg-gray-50"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Generate Summary
-              </button>
-            )}
+
           </div>
         </div>
 

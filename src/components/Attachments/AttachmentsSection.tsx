@@ -221,7 +221,7 @@ const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ clientId, showL
                                     <AttachmentItem
                                         key={attachment.id}
                                         attachment={attachment}
-                                        onDelete={user?.role === 'admin' ? handleDeleteAttachment : undefined}
+                                        onDelete={['admin', 'staff'].includes(user?.role || '') ? handleDeleteAttachment : undefined}
                                     />
                                 ))}
                             </div>
