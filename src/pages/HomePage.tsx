@@ -20,6 +20,7 @@ const HomePage: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTasksMap, setActiveTasksMap] = useState<Record<string, boolean>>({});
 
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,6 +40,16 @@ const HomePage: React.FC = () => {
         const fetchedClients = await api.getClients();
         fetchedClients.sort((a, b) => a.profile.lastName.localeCompare(b.profile.lastName));
         setClients(fetchedClients);
+
+        // Fetch all tasks to determine "Active Task" status
+        const allTasks = await api.getTasks();
+        const activeMap: Record<string, boolean> = {};
+        allTasks.forEach(task => {
+          if (task.clientId && (task.status === 'Open' || task.status === 'In Progress' || task.status === 'Waiting')) {
+            activeMap[task.clientId] = true;
+          }
+        });
+        setActiveTasksMap(activeMap);
       } catch (error) {
         console.error("Failed to fetch clients:", error);
       } finally {
@@ -175,40 +186,51 @@ const HomePage: React.FC = () => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Case Manager</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Type</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Added</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Most Recent Case Note</th>
+                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Active Task</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Added</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                       <th scope="col" className="relative px-6 py-3"><span className="sr-only">View</span></th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {loading ? (
-                      <tr><td colSpan={7} className="p-4 text-center text-gray-500">Loading clients...</td></tr>
+                      <tr><td colSpan={9} className="p-4 text-center text-gray-500">Loading clients...</td></tr>
                     ) : filteredClients.length > 0 ? (
-                      filteredClients.map(client => (
-                        <tr key={client.id} onClick={() => navigate(`/clients/${client.id}`)} className="hover:bg-gray-50 cursor-pointer">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{client.profile.firstName} {client.profile.lastName}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.metadata.assignedAdminName || 'Unassigned'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.metadata.clientType}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <ClientStatusBadge status={client.metadata.status} />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {client.metadata.dateApplication ? new Date(client.metadata.dateApplication).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {client.metadata.lastCaseNoteDate ? new Date(client.metadata.lastCaseNoteDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.contactInfo.phone}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <ArrowRight className="h-5 w-5 text-gray-400" />
-                          </td>
-                        </tr>
-                      ))
+                      filteredClients.map(client => {
+                        const hasActiveTask = activeTasksMap[client.id];
+                        return (
+                          <tr key={client.id} onClick={() => navigate(`/clients/${client.id}`)} className="hover:bg-gray-50 cursor-pointer">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{client.profile.firstName} {client.profile.lastName}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.metadata.assignedAdminName || 'Unassigned'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.metadata.clientType}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <ClientStatusBadge status={client.metadata.status} />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {client.metadata.lastCaseNoteDate ? new Date(client.metadata.lastCaseNoteDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-green-600 font-bold">
+                              {hasActiveTask ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✓
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {client.metadata.dateApplication ? new Date(client.metadata.dateApplication).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{client.contactInfo.phone}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <ArrowRight className="h-5 w-5 text-gray-400" />
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
-                      <tr><td colSpan={7} className="p-4 text-center text-gray-500">
+                      <tr><td colSpan={9} className="p-4 text-center text-gray-500">
                         No clients found matching your filters.
                         {clients.length === 0 && !loading && ' Click "Add Client" to create your first real client.'}
                       </td></tr>
