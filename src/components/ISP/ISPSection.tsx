@@ -3,7 +3,7 @@ import api from '../../lib/firebase';
 import { ISP, Client } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../Card';
-import { CheckSquare, Edit, Square, Printer, Plus, Trash2 } from 'lucide-react';
+import { Printer, Plus, Trash2, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import AttachmentsSection from '../Attachments/AttachmentsSection';
 
 interface ISPSectionProps {
@@ -33,36 +33,25 @@ const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
     supportServices: [],
 };
 
-const TableView = ({ headers, data, renderRow }: { headers: string[], data: any[], renderRow: (item: any) => React.ReactNode }) => (
-    <div className="overflow-x-auto">
-        <table className="min-w-full text-sm bg-white">
-            <thead className="bg-gray-100">
-                <tr>{headers.map(h => <th key={h} className="p-2 text-left font-semibold text-gray-600">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y">{data.map(renderRow)}</tbody>
-        </table>
-    </div>
-);
-
 const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => {
     const { user } = useAuth();
-    const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<Partial<ISP>>(defaultISPForm);
     const [isSaving, setIsSaving] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const { id: clientId, profile, metadata } = client;
 
     useEffect(() => {
-        if (isEditing) {
-            setFormData(isp || defaultISPForm);
-        }
-    }, [isEditing, isp]);
-
-    const [isProcessing, setIsProcessing] = useState(false);
+        setFormData(isp || defaultISPForm);
+    }, [isp]);
 
     // Auto-OCR Handler
     const handleFileUploaded = async (file: File) => {
         if (file.name.startsWith("2.1")) {
             setIsProcessing(true);
+            setError(null);
+            setSuccess(null);
             try {
                 const extractedData = await api.extractFormData(file, 'ISP');
 
@@ -75,8 +64,6 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                     };
 
                     // 2. Auto-Save to Backend
-                    // Ensure we have all necessary fields for a valid ISP object
-                    // If creating new, generate ID. If updating, use existing.
                     const ispId = isp?.id || crypto.randomUUID();
 
                     const ispDataToSave = {
@@ -85,41 +72,27 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                         ...newData,
                         clientId: clientId,
                         id: ispId,
-                        // Ensure ISP Date is set
                         ispDate: newData.ispDate || Date.now()
                     } as ISP;
 
                     api.upsertISP(ispDataToSave).then(() => {
-                        // Refresh logic handled by parent via onIspUpdate?
-                        // Actually onIspUpdate expects an ISP object and likely refreshes parent state
                         onIspUpdate(ispDataToSave);
-                        alert(`ISP auto-filled and saved from ${file.name}`);
+                        setSuccess(`ISP auto-filled and saved from ${file.name}`);
                     }).catch(err => {
                         console.error("Auto-save failed:", err);
-                        alert("Auto-fill worked but save failed: " + err.message);
+                        setError("Auto-fill worked but save failed: " + err.message);
                     });
 
                     return newData;
                 });
 
-                // If not editing, switch to edit mode to show changes? 
-                // Or just show them in the read-only view if they match?
-                // The read-only view relies on `isp` prop, which comes from parent.
-                // onIspUpdate should update the parent, which flows back down.
-                setIsEditing(true);
-
             } catch (err: any) {
                 console.error("Failed to auto-fill ISP:", err);
-                alert("Failed to auto-fill: " + err.message);
+                setError("Failed to auto-fill: " + err.message);
             } finally {
                 setIsProcessing(false);
             }
         }
-    };
-    const handleEdit = () => setIsEditing(true);
-    const handleCancel = () => {
-        setIsEditing(false);
-        setFormData(isp || defaultISPForm);
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -170,9 +143,11 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         setFormData(prev => ({ ...prev, [listName]: (prev[listName] as any[] || []).filter((_, i) => i !== index) }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSave = async () => {
         setIsSaving(true);
+        setError(null);
+        setSuccess(null);
+
         // Ensure ID is present for new ISPs
         const dataToSave = {
             ...formData,
@@ -183,10 +158,10 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
         try {
             await onIspUpdate(dataToSave);
-            setIsEditing(false);
+            setSuccess("ISP saved successfully.");
         } catch (error: any) {
             console.error("Failed to save ISP:", error);
-            alert(`Error saving ISP: ${error.message || error}`);
+            setError(`Error saving ISP: ${error.message || error}`);
         } finally {
             setIsSaving(false);
         }
@@ -194,6 +169,14 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
     const generateISPPrintHTML = () => {
         if (!isp) return '';
+        // Use formData if available for printing current state, or fallback to isp? 
+        // Usually printing happens on saved data, but let's use formData so what they see is what they print if they haven't saved yet? 
+        // Actually, usually print is for record, so maybe saved data. 
+        // But the previous implementation used `isp` prop.
+        // Let's use `formData` cast to ISP so it reflects current edits which is often desired.
+        const dataToPrint = formData as ISP;
+        if (!dataToPrint) return '';
+
         const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString();
         const fieldStyle = "border-b border-gray-600 flex-grow min-w-0";
         const rowStyle = "flex items-end space-x-2 mb-2";
@@ -201,12 +184,12 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
         const barriersHTML = barrierOptions.map(b => `
             <div class="flex items-center">
-                <div class="w-4 h-4 border border-gray-600 mr-2 flex-shrink-0">${isp.identifiedBarriers.includes(b) ? '<span class="text-sm">✓</span>' : ''}</div>
+                <div class="w-4 h-4 border border-gray-600 mr-2 flex-shrink-0">${(dataToPrint.identifiedBarriers || []).includes(b) ? '<span class="text-sm">✓</span>' : ''}</div>
                 <span>${b}</span>
             </div>
         `).join('');
 
-        const planOfActionHTML = (isp.planOfAction || []).map(item => `
+        const planOfActionHTML = (dataToPrint.planOfAction || []).map(item => `
             <tr class="border-b">
                 <td class="p-1 border-r">${item.goal || '&nbsp;'}</td>
                 <td class="p-1 border-r">${item.action || '&nbsp;'}</td>
@@ -215,15 +198,15 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 <td class="p-1 border-r">${item.reviewDate || '&nbsp;'}</td>
                 <td class="p-1">${item.completionDate || '&nbsp;'}</td>
             </tr>
-        `).join('') + Array(Math.max(0, 5 - (isp.planOfAction || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
+        `).join('') + Array(Math.max(0, 5 - (dataToPrint.planOfAction || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
 
-        const supportServicesHTML = (isp.supportServices || []).map(item => `
+        const supportServicesHTML = (dataToPrint.supportServices || []).map(item => `
              <tr class="border-b">
                 <td class="p-1 border-r">${item.agency || '&nbsp;'}</td>
                 <td class="p-1 border-r">${item.referralDate || '&nbsp;'}</td>
                 <td class="p-1">${item.outcome || '&nbsp;'}</td>
             </tr>
-        `).join('') + Array(Math.max(0, 3 - (isp.supportServices || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
+        `).join('') + Array(Math.max(0, 3 - (dataToPrint.supportServices || []).length)).fill(0).map(() => `<tr class="border-b"><td class="p-1 border-r h-8">&nbsp;</td><td class="p-1 border-r">&nbsp;</td><td class="p-1">&nbsp;</td></tr>`).join('');
 
         return `
             <html>
@@ -242,27 +225,27 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                     <div class="${rowStyle}"><span class="${labelStyle}">Participant Name:</span><div class="${fieldStyle}">${profile.firstName} ${profile.lastName}</div></div>
                     <div class="grid grid-cols-2 gap-x-8">
                         <div class="${rowStyle}"><span class="${labelStyle}">DOB:</span><div class="${fieldStyle}">${profile.dob}</div></div>
-                        <div class="${rowStyle}"><span class="${labelStyle}">Date:</span><div class="${fieldStyle}">${formatDate(isp.ispDate)}</div></div>
+                        <div class="${rowStyle}"><span class="${labelStyle}">Date:</span><div class="${fieldStyle}">${formatDate(dataToPrint.ispDate)}</div></div>
                     </div>
                     <div class="${rowStyle}"><span class="${labelStyle}">Case Manager:</span><div class="${fieldStyle}">${metadata.assignedAdminName}</div></div>
-                    <div class="${rowStyle}"><span class="${labelStyle}">Job Developer:</span><div class="${fieldStyle}">${isp.jobDeveloper || ''}</div></div>
+                    <div class="${rowStyle}"><span class="${labelStyle}">Job Developer:</span><div class="${fieldStyle}">${dataToPrint.jobDeveloper || ''}</div></div>
 
                     <div class="content-avoid-break mt-6">
                         <h3 class="font-bold">Acknowledgment</h3>
                         <p class="text-xs mt-1">By initialing, I acknowledge and agree to participate and engage in the WRTP program. As a participant, I agree to regularly meet with WRTP staff to support my individual participant outcomes in order for successful completion of the program.</p>
-                        <p class="mt-2">Acknowledgment: ${isp.acknowledgmentInitialed ? '<strong>Initialed & Agreed</strong>' : 'Not Acknowledged'}</p>
+                        <p class="mt-2">Acknowledgment: ${dataToPrint.acknowledgmentInitialed ? '<strong>Initialed & Agreed</strong>' : 'Not Acknowledged'}</p>
                     </div>
 
                     <div class="content-avoid-break mt-4">
                         <h3 class="font-bold">How can WRTP be of service to you? (1–3 month goals)</h3>
-                        <div class="border-b border-gray-600 mt-1 pl-2 whitespace-pre-wrap">${isp.shortTermGoals || ''}</div>
+                        <div class="border-b border-gray-600 mt-1 pl-2 whitespace-pre-wrap">${dataToPrint.shortTermGoals || ''}</div>
                         <div class="border-b border-gray-600 mt-2"></div>
                         <div class="border-b border-gray-600 mt-2"></div>
                     </div>
                     
                     <div class="content-avoid-break mt-4">
                         <h3 class="font-bold">Long-Term Goals (6−12+ months)</h3>
-                        <div class="border-b border-gray-600 mt-1 pl-2 whitespace-pre-wrap">${isp.longTermGoals || ''}</div>
+                        <div class="border-b border-gray-600 mt-1 pl-2 whitespace-pre-wrap">${dataToPrint.longTermGoals || ''}</div>
                         <div class="border-b border-gray-600 mt-2"></div>
                         <div class="border-b border-gray-600 mt-2"></div>
                     </div>
@@ -274,11 +257,11 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
 
                     <div class="content-avoid-break mt-4">
                         <h3 class="font-bold">Career Planning</h3>
-                        <div class="${rowStyle} mt-1"><span class="${labelStyle}">Workshop(s) Assigned:</span><div class="${fieldStyle}">${isp.careerPlanning.workshopsAssigned}</div></div>
+                        <div class="${rowStyle} mt-1"><span class="${labelStyle}">Workshop(s) Assigned:</span><div class="${fieldStyle}">${dataToPrint.careerPlanning?.workshopsAssigned || ''}</div></div>
                         <div class="flex items-center space-x-4">
                             <span>Enrolled in CTE/Training Program/College:</span>
-                            <div class="flex items-center"><div class="w-4 h-4 border border-gray-600 mr-1">${isp.careerPlanning.enrolledInCteOrCollege ? '✓' : ''}</div> YES</div>
-                            <div class="flex items-center"><div class="w-4 h-4 border border-gray-600 mr-1">${!isp.careerPlanning.enrolledInCteOrCollege ? '✓' : ''}</div> NO</div>
+                            <div class="flex items-center"><div class="w-4 h-4 border border-gray-600 mr-1">${dataToPrint.careerPlanning?.enrolledInCteOrCollege ? '✓' : ''}</div> YES</div>
+                            <div class="flex items-center"><div class="w-4 h-4 border border-gray-600 mr-1">${!dataToPrint.careerPlanning?.enrolledInCteOrCollege ? '✓' : ''}</div> NO</div>
                         </div>
                     </div>
                 
@@ -320,7 +303,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 setTimeout(() => {
                     printWindow.print();
                     printWindow.close();
-                }, 500); // Allow time for styles to load
+                }, 500);
             }
         }
     };
@@ -329,197 +312,125 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         <div className="space-y-6">
             <AttachmentsSection clientId={clientId} category="ISP" showList={true} onFileUploaded={handleFileUploaded} />
 
-            {(isEditing || !isp) ? (
-                <Card title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"} titleAction={
-                    user?.role === 'admin' && (
-                        <label className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-white bg-[#404E3B] hover:bg-[#5a6c53] cursor-pointer">
-                            Auto-Fill (PDF)
-                            <input
-                                type="file"
-                                accept="application/pdf,image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        const file = e.target.files[0];
-                                        try {
-                                            const extractedData = await api.extractFormData(file, 'ISP');
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                ...extractedData,
-                                                careerPlanning: { ...prev.careerPlanning, ...(extractedData.careerPlanning || {}) }
-                                            }));
-                                            alert(`ISP populated from ${file.name}.`);
-                                        } catch (err: any) {
-                                            console.error("Failed to auto-fill ISP:", err);
-                                            alert("Failed to auto-fill: " + err.message);
-                                        }
-                                    }
-                                }}
-                            />
-                        </label>
-                    )
-                }>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="ispDate" className="label">ISP Date</label>
-                                <input
-                                    type="date"
-                                    id="ispDate"
-                                    name="ispDate"
-                                    value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
-                                    className="form-input"
-                                />
-                            </div>
-                            <div><label htmlFor="jobDeveloper" className="label">Job Developer</label><input type="text" id="jobDeveloper" name="jobDeveloper" value={formData.jobDeveloper || ''} onChange={handleInputChange} className="form-input" /></div>
-                        </div>
-
-                        <fieldset><legend className="legend">Goals</legend>
-                            <div><label htmlFor="shortTermGoals" className="label">How can WRTP be of service to you? (1–3 month goals)</label><textarea id="shortTermGoals" name="shortTermGoals" value={formData.shortTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
-                            <div><label htmlFor="longTermGoals" className="label">Long-Term Goals (6−12+ months)</label><textarea id="longTermGoals" name="longTermGoals" value={formData.longTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
-                        </fieldset>
-
-                        <fieldset><legend className="legend">Identified Barriers/Needs</legend>
-                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
-                        </fieldset>
-
-                        <fieldset><legend className="legend">Career Planning</legend>
-                            <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
-                            <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
-                        </fieldset>
-
-                        <fieldset><legend className="legend">Plan of Action - Who will do what and when?</legend>
-                            {(formData.planOfAction || []).map((item, index) => (
-                                <div key={item.id} className="p-2 border rounded-md space-y-2 mb-2">
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                                        <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2" />
-                                        <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2" />
-                                        <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input" />
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
-                                        <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input" /></div>
-                                        <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input" /></div>
-                                        <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input" /></div>
-                                        <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5" /></button>
-                                    </div>
-                                </div>
-                            ))}
-                            <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Action Item</button>
-                        </fieldset>
-
-                        <fieldset><legend className="legend">Support Services</legend>
-                            {(formData.supportServices || []).map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
-                                    <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2" />
-                                    <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input" /></div>
-                                    <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3" />
-                                    <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5" /></button>
-                                </div>
-                            ))}
-                            <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Referral</button>
-                        </fieldset>
-
-                        <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox" /><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
-
-                        <div className="flex justify-end pt-4 border-t">
-                            {isp && <button type="button" onClick={handleCancel} className="btn-secondary">Cancel</button>}
-                            <button type="submit" disabled={isSaving} className="btn-primary ml-3">{isSaving ? 'Saving...' : 'Save ISP'}</button>
-                        </div>
-                    </form>
-                    <style>{`
-                        .label { display: block; margin-bottom: 0.25rem; font-medium; color: #374151; font-size: 0.875rem; }
-                        .legend { font-size: 1.125rem; font-medium: 600; color: #111827; margin-bottom: 0.5rem; }
-                        .form-input { display: block; width: 100%; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; }
-                        .form-input:focus { outline: none; border-color: #404E3B; box-shadow: 0 0 0 2px rgba(64, 78, 59, 0.3); }
-                        .form-checkbox { height: 1rem; width: 1rem; color: #404E3B; border-color: #D1D5DB; border-radius: 0.25rem; focus:ring-[#404E3B]; }
-                        .btn-primary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: white; background-color: #404E3B; }
-                        .btn-primary:hover { background-color: #5a6c53; } .btn-primary:disabled { background-color: #8d9b89; }
-                        .btn-secondary { display: inline-flex; justify-content: center; padding: 0.5rem 1rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); font-size: 0.875rem; font-medium: 500; color: #374151; background-color: white; }
-                        .btn-secondary:hover { background-color: #F9FAFB; }
-                    `}</style>
-                </Card>
-            ) : (
-                <Card title="Individual Service Plan" titleAction={
-                    <div className="flex items-center space-x-2 no-print">
-                        <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"><Printer className="h-4 w-4 mr-2" />Print ISP</button>
+            <Card
+                title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"}
+                titleAction={
+                    <div className="flex items-center space-x-2">
+                        <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print
+                        </button>
                         {user?.role === 'admin' && (
-                            <button onClick={handleEdit} className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-[#404E3B] bg-[#E6E6E6] hover:bg-[#f2f2f2]"><Edit className="h-4 w-4 mr-2" />Edit ISP</button>
+                            <label className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                                {isProcessing ? 'Processing...' : 'Auto-Fill'}
+                                <input
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            handleFileUploaded(e.target.files[0]);
+                                            e.target.value = ''; // Reset
+                                        }
+                                    }}
+                                />
+                            </label>
                         )}
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] disabled:bg-[#8d9b89] disabled:cursor-not-allowed"
+                        >
+                            {isSaving ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
+                        </button>
                     </div>
-                }>
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <h4 className="font-semibold">ISP Date</h4>
-                                <p>{new Date(isp!.ispDate).toLocaleDateString()}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold">Job Developer</h4>
-                                <p>{isp!.jobDeveloper || 'N/A'}</p>
-                            </div>
+                }
+            >
+                <div className="space-y-6">
+                    {error && (
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 flex items-center text-red-700">
+                            <AlertCircle className="w-5 h-5 mr-2" />
+                            {error}
                         </div>
-                        <div>
-                            <h4 className="font-semibold">Short-Term Goals (1-3 months)</h4>
-                            <p className="whitespace-pre-wrap">{isp!.shortTermGoals || 'N/A'}</p>
+                    )}
+
+                    {success && (
+                        <div className="bg-green-50 border-l-4 border-green-500 p-4 flex items-center text-green-700">
+                            <CheckCircle className="w-5 h-5 mr-2" />
+                            {success}
                         </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <h4 className="font-semibold">Long-Term Goals (6-12+ months)</h4>
-                            <p className="whitespace-pre-wrap">{isp!.longTermGoals || 'N/A'}</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold">Identified Barriers</h4>
-                            {isp!.identifiedBarriers.length > 0 ? (
-                                <ul className="list-disc list-inside">
-                                    {isp!.identifiedBarriers.map(b => <li key={b}>{b}</li>)}
-                                </ul>
-                            ) : (
-                                <p>No barriers identified.</p>
-                            )}
-                        </div>
-                        <div>
-                            <h4 className="font-semibold">Career Planning</h4>
-                            <p>Workshops: {isp!.careerPlanning.workshopsAssigned || 'None'}</p>
-                            <p>Enrolled in CTE/College: {isp!.careerPlanning.enrolledInCteOrCollege ? 'Yes' : 'No'}</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold">Plan of Action</h4>
-                            <TableView
-                                headers={['Goal', 'Action', 'Responsible Party', 'Target Date', 'Review Date', 'Completion Date']}
-                                data={isp!.planOfAction || []}
-                                renderRow={item => (
-                                    <tr key={item.id}>
-                                        <td className="p-2">{item.goal}</td>
-                                        <td className="p-2">{item.action}</td>
-                                        <td className="p-2">{item.responsibleParty}</td>
-                                        <td className="p-2">{item.targetDate}</td>
-                                        <td className="p-2">{item.reviewDate}</td>
-                                        <td className="p-2">{item.completionDate}</td>
-                                    </tr>
-                                )}
+                            <label htmlFor="ispDate" className="label">ISP Date</label>
+                            <input
+                                type="date"
+                                id="ispDate"
+                                name="ispDate"
+                                value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
+                                className="form-input"
                             />
                         </div>
-                        <div>
-                            <h4 className="font-semibold">Support Services</h4>
-                            <TableView
-                                headers={['Agency', 'Referral Date', 'Outcome']}
-                                data={isp!.supportServices || []}
-                                renderRow={item => (
-                                    <tr key={item.id}>
-                                        <td className="p-2">{item.agency}</td>
-                                        <td className="p-2">{item.referralDate}</td>
-                                        <td className="p-2">{item.outcome}</td>
-                                    </tr>
-                                )}
-                            />
-                        </div>
-                        <div className="flex items-center pt-4 border-t">
-                            {isp!.acknowledgmentInitialed ? <CheckSquare className="h-5 w-5 text-green-600 mr-2" /> : <Square className="h-5 w-5 text-gray-400 mr-2" />}
-                            <span className="font-medium">Client has acknowledged this ISP.</span>
-                        </div>
+                        <div><label htmlFor="jobDeveloper" className="label">Job Developer</label><input type="text" id="jobDeveloper" name="jobDeveloper" value={formData.jobDeveloper || ''} onChange={handleInputChange} className="form-input" /></div>
                     </div>
-                </Card>
-            )}
+
+                    <fieldset><legend className="legend">Goals</legend>
+                        <div><label htmlFor="shortTermGoals" className="label">How can WRTP be of service to you? (1–3 month goals)</label><textarea id="shortTermGoals" name="shortTermGoals" value={formData.shortTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
+                        <div><label htmlFor="longTermGoals" className="label">Long-Term Goals (6−12+ months)</label><textarea id="longTermGoals" name="longTermGoals" value={formData.longTermGoals || ''} onChange={handleInputChange} rows={3} className="form-input" /></div>
+                    </fieldset>
+
+                    <fieldset><legend className="legend">Identified Barriers/Needs</legend>
+                        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">{barrierOptions.map(barrier => <label key={barrier} className="flex items-center"><input type="checkbox" value={barrier} checked={formData.identifiedBarriers?.includes(barrier)} onChange={handleBarrierChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">{barrier}</span></label>)}</div>
+                    </fieldset>
+
+                    <fieldset><legend className="legend">Career Planning</legend>
+                        <div><label htmlFor="careerPlanning.workshopsAssigned" className="label">Workshops Assigned</label><input type="text" id="careerPlanning.workshopsAssigned" name="careerPlanning.workshopsAssigned" value={formData.careerPlanning?.workshopsAssigned || ''} onChange={handleNestedInputChange} className="form-input" /></div>
+                        <label className="flex items-center mt-2"><input type="checkbox" name="careerPlanning.enrolledInCteOrCollege" checked={formData.careerPlanning?.enrolledInCteOrCollege} onChange={handleNestedCheckboxChange} className="form-checkbox" /><span className="ml-2 text-sm text-gray-700">Enrolled in CTE or College Program</span></label>
+                    </fieldset>
+
+                    <fieldset><legend className="legend">Plan of Action - Who will do what and when?</legend>
+                        {(formData.planOfAction || []).map((item, index) => (
+                            <div key={item.id} className="p-2 border rounded-md space-y-2 mb-2">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                    <textarea placeholder="Goal" value={item.goal} onChange={e => handleDynamicListChange('planOfAction', index, 'goal', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                    <textarea placeholder="Action" value={item.action} onChange={e => handleDynamicListChange('planOfAction', index, 'action', e.target.value)} rows={2} className="form-input md:col-span-2" />
+                                    <input type="text" placeholder="Who?" value={item.responsibleParty} onChange={e => handleDynamicListChange('planOfAction', index, 'responsibleParty', e.target.value)} className="form-input" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                                    <div><label className="text-xs">Target Date</label><input type="date" value={item.targetDate} onChange={e => handleDynamicListChange('planOfAction', index, 'targetDate', e.target.value)} className="form-input" /></div>
+                                    <div><label className="text-xs">Review Date</label><input type="date" value={item.reviewDate} onChange={e => handleDynamicListChange('planOfAction', index, 'reviewDate', e.target.value)} className="form-input" /></div>
+                                    <div><label className="text-xs">Completion Date</label><input type="date" value={item.completionDate} onChange={e => handleDynamicListChange('planOfAction', index, 'completionDate', e.target.value)} className="form-input" /></div>
+                                    <button type="button" onClick={() => removeDynamicListItem('planOfAction', index)} className="self-end text-red-500 hover:text-red-700 justify-self-center"><Trash2 className="w-5 h-5" /></button>
+                                </div>
+                            </div>
+                        ))}
+                        <button type="button" onClick={() => addDynamicListItem('planOfAction')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Action Item</button>
+                    </fieldset>
+
+                    <fieldset><legend className="legend">Support Services</legend>
+                        {(formData.supportServices || []).map((item, index) => (
+                            <div key={item.id} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center mb-2 p-2 border rounded-md">
+                                <input type="text" placeholder="Agency" value={item.agency} onChange={e => handleDynamicListChange('supportServices', index, 'agency', e.target.value)} className="form-input md:col-span-2" />
+                                <div><label className="text-xs">Referral Date</label><input type="date" value={item.referralDate} onChange={e => handleDynamicListChange('supportServices', index, 'referralDate', e.target.value)} className="form-input" /></div>
+                                <input type="text" placeholder="Outcome" value={item.outcome} onChange={e => handleDynamicListChange('supportServices', index, 'outcome', e.target.value)} className="form-input md:col-span-3" />
+                                <button type="button" onClick={() => removeDynamicListItem('supportServices', index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5" /></button>
+                            </div>
+                        ))}
+                        <button type="button" onClick={() => addDynamicListItem('supportServices')} className="inline-flex items-center text-sm text-[#404E3B] hover:text-[#313c2e] mt-2"><Plus className="w-4 h-4 mr-1" />Add Referral</button>
+                    </fieldset>
+
+                    <fieldset><label className="flex items-center"><input type="checkbox" name="acknowledgmentInitialed" checked={!!formData.acknowledgmentInitialed} onChange={handleCheckboxChange} className="form-checkbox" /><span className="ml-2 font-medium text-gray-700">Client has initialed and acknowledged this ISP.</span></label></fieldset>
+                </div>
+                <style>{`
+                    .label { display: block; margin-bottom: 0.25rem; font-medium; color: #374151; font-size: 0.875rem; }
+                    .legend { font-size: 1.125rem; font-medium: 600; color: #111827; margin-bottom: 0.5rem; }
+                    .form-input { display: block; width: 100%; padding: 0.5rem; border: 1px solid #D1D5DB; border-radius: 0.375rem; }
+                    .form-input:focus { outline: none; border-color: #404E3B; box-shadow: 0 0 0 2px rgba(64, 78, 59, 0.3); }
+                    .form-checkbox { height: 1rem; width: 1rem; color: #404E3B; border-color: #D1D5DB; border-radius: 0.25rem; focus:ring-[#404E3B]; }
+                `}</style>
+            </Card>
         </div>
     );
 };
