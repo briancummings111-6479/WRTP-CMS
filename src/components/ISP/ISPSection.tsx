@@ -18,8 +18,12 @@ const barrierOptions = [
     "Substance Use", "Transportation", "Criminal Background/Court", "Other"
 ];
 
-const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
-    ispDate: Date.now(),
+import { toInputDateString, getTodayAsUTC } from '../../lib/utils';
+
+// ... imports
+
+const getDefaultISPForm = (): Omit<ISP, 'id' | 'clientId'> => ({
+    ispDate: getTodayAsUTC(),
     jobDeveloper: '',
     acknowledgmentInitialed: false,
     shortTermGoals: '',
@@ -31,11 +35,11 @@ const defaultISPForm: Omit<ISP, 'id' | 'clientId'> = {
     },
     planOfAction: [],
     supportServices: [],
-};
+});
 
 const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => {
     const { user } = useAuth();
-    const [formData, setFormData] = useState<Partial<ISP>>(defaultISPForm);
+    const [formData, setFormData] = useState<Partial<ISP>>(() => isp || getDefaultISPForm());
     const [isSaving, setIsSaving] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -43,7 +47,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
     const { id: clientId, profile, metadata } = client;
 
     useEffect(() => {
-        setFormData(isp || defaultISPForm);
+        setFormData(isp || getDefaultISPForm());
     }, [isp]);
 
     // Auto-OCR Handler
@@ -67,12 +71,12 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                     const ispId = isp?.id || crypto.randomUUID();
 
                     const ispDataToSave = {
-                        ...defaultISPForm,
+                        ...getDefaultISPForm(),
                         ...isp,
                         ...newData,
                         clientId: clientId,
                         id: ispId,
-                        ispDate: newData.ispDate || Date.now()
+                        ispDate: newData.ispDate || getTodayAsUTC()
                     } as ISP;
 
                     api.upsertISP(ispDataToSave).then(() => {
@@ -152,7 +156,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         const dataToSave = {
             ...formData,
             clientId,
-            ispDate: formData.ispDate || Date.now(),
+            ispDate: formData.ispDate || getTodayAsUTC(),
             id: isp?.id || crypto.randomUUID()
         } as ISP;
 
@@ -368,7 +372,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                                 type="date"
                                 id="ispDate"
                                 name="ispDate"
-                                value={formData.ispDate ? new Date(formData.ispDate).toISOString().split('T')[0] : ''}
+                                value={toInputDateString(formData.ispDate)}
                                 onChange={(e) => setFormData(prev => ({ ...prev, ispDate: e.target.valueAsNumber }))}
                                 className="form-input"
                             />

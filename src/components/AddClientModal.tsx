@@ -25,7 +25,13 @@ const initialAuditChecklist: AuditChecklist = [
 ];
 // ----------------------------------------
 
-const initialFormData = {
+import { toInputDateString } from '../lib/utils';
+
+// ...
+
+// ----------------------------------------
+
+const getInitialFormData = () => ({
     profile: {
         firstName: '',
         lastName: '',
@@ -69,9 +75,9 @@ const initialFormData = {
         assignedAdminName: '',
         clientType: 'General Population' as Client['metadata']['clientType'],
         status: 'Prospect' as Client['metadata']['status'],
-        dateApplication: new Date().toISOString().split('T')[0], // Default to today
+        dateApplication: toInputDateString(Date.now()), // toInputDateString handles Date.now correctly for "Today"
     },
-};
+});
 
 const CheckboxInput = ({ label, name, checked, onChange }: { label: string, name: string, checked: boolean, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
     <label className="flex items-center">
@@ -82,7 +88,7 @@ const CheckboxInput = ({ label, name, checked, onChange }: { label: string, name
 
 
 const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave, staff }) => {
-    const [formData, setFormData] = useState<any>(initialFormData);
+    const [formData, setFormData] = useState<any>(() => getInitialFormData());
     const [isSaving, setIsSaving] = useState(false);
     const { user } = useAuth();
 
@@ -101,7 +107,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
         }
         // Reset form on close
         if (!isOpen) {
-            setFormData(initialFormData);
+            setFormData(getInitialFormData());
         }
     }, [isOpen, staff]);
 
