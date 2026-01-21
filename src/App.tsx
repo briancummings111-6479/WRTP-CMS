@@ -14,6 +14,7 @@ import SignUpPage from './pages/SignUpPage';
 import PendingApprovalPage from './pages/PendingApprovalPage';
 import UsersPage from './pages/UsersPage';
 import ToDoPage from './pages/ToDoPage';
+import JobsDashboard from './pages/JobsDashboard';
 
 
 // Protected Route Component
@@ -82,9 +83,15 @@ function App() {
               <Layout><ReportsPage /></Layout>
             </ProtectedRoute>
           } />
+
           <Route path="/todo" element={
             <ProtectedRoute>
               <Layout><ToDoPage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/jobs" element={
+            <ProtectedRoute>
+              <Layout><JobsDashboard /></Layout>
             </ProtectedRoute>
           } />
 

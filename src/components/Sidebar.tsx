@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const commonNavItems: { to: string; text: string; icon: React.ElementType }[] = [
   { to: '/', text: 'Dashboard', icon: Home },
+  { to: '/jobs', text: 'Jobs Dashboard', icon: FileBarChart },
   { to: '/todo', text: 'Task Management', icon: ClipboardList },
   { to: '/reports', text: 'Reports', icon: BarChart2 },
 ];

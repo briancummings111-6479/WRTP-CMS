@@ -141,7 +141,11 @@ export const extractFormDataFromPdf = onCall({ timeoutSeconds: 60, memory: "1GiB
             throw new Error("No extracted text returned.");
         }
 
-        const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            throw new Error("No JSON object found in response.");
+        }
+        const jsonString = jsonMatch[0];
         return JSON.parse(jsonString);
 
     } catch (error: any) {

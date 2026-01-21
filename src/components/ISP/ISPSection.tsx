@@ -3,7 +3,7 @@ import api from '../../lib/firebase';
 import { ISP, Client } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../Card';
-import { Printer, Plus, Trash2, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { Printer, Plus, Trash2, Save, AlertCircle, CheckCircle, RotateCcw } from 'lucide-react';
 import AttachmentsSection from '../Attachments/AttachmentsSection';
 
 interface ISPSectionProps {
@@ -50,6 +50,14 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
         setFormData(isp || getDefaultISPForm());
     }, [isp]);
 
+    const handleClear = () => {
+        if (window.confirm("Are you sure you want to clear the entire form? This action cannot be undone.")) {
+            setFormData(getDefaultISPForm());
+            setSuccess("Form cleared.");
+            setError(null);
+        }
+    };
+
     // Auto-OCR Handler
     const handleFileUploaded = async (file: File) => {
         if (file.name.startsWith("2.1")) {
@@ -76,7 +84,7 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                         ...newData,
                         clientId: clientId,
                         id: ispId,
-                        ispDate: newData.ispDate || getTodayAsUTC()
+                        ispDate: (extractedData.ispDate && extractedData.ispDate > 1577836800000) ? extractedData.ispDate : (prev.ispDate || getTodayAsUTC())
                     } as ISP;
 
                     api.upsertISP(ispDataToSave).then(() => {
@@ -320,6 +328,10 @@ const ISPSection: React.FC<ISPSectionProps> = ({ client, isp, onIspUpdate }) => 
                 title={isp ? "Edit Individual Service Plan" : "Create Individual Service Plan"}
                 titleAction={
                     <div className="flex items-center space-x-2">
+                        <button onClick={handleClear} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-red-50 hover:text-red-700 hover:border-red-300">
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Clear
+                        </button>
                         <button onClick={handlePrint} className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                             <Printer className="h-4 w-4 mr-2" />
                             Print

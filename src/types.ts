@@ -119,6 +119,10 @@ export interface Demographics {
   veteran?: boolean;
   releasedCorrectionalFacility?: boolean;
   selfCertificationAnnualIncome?: number;
+  // Jobs Dashboard Fields
+  desiredWage?: string;
+  desiredJobType?: 'Full-time' | 'Part-time' | 'Both' | 'Any';
+  jobSearchStatus?: 'Searching' | 'Interviewing' | 'Offer Received' | 'Hired' | 'Not Searching' | 'Unknown';
 }
 
 // Main Client Data Model
