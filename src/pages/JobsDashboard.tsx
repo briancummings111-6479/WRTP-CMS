@@ -388,7 +388,7 @@ const JobsDashboard: React.FC = () => {
                         onChange={(e) => setIndustryFilter(e.target.value)}
                     >
                         <option>All Industries</option>
-                        {usedIndustries.map(i => <option key={i} value={i}>{i}</option>)}
+                        {INDUSTRY_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
                     </select>
                 </div>
                 <div className="flex items-center space-x-2 bg-white rounded px-3 py-2">
