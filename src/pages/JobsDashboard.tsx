@@ -31,6 +31,44 @@ type SortConfig = {
     direction: 'asc' | 'desc';
 };
 
+const INDUSTRY_OPTIONS = [
+    "Accountant / Bookkeeper",
+    "Apprentice (Electrician, Plumber, HVAC)",
+    "Barista",
+    "Carpenter",
+    "Construction",
+    "Cook",
+    "Cosmetology",
+    "Customer Service",
+    "Delivery Driver",
+    "EMT",
+    "Entrepreneur",
+    "Facilities Maintenance",
+    "Fire Tech",
+    "Flooring Installer",
+    "Flagger",
+    "General Laborer",
+    "Groundskeeper / Landscaper",
+    "Heavy Equipment Operator",
+    "Home Health Aide",
+    "Janitor",
+    "Logging",
+    "Masonry",
+    "Medical Assistant",
+    "Nursing",
+    "Office / Clerical",
+    "Painter/Drywaller",
+    "Phlebotomist",
+    "Restaurant",
+    "Retail",
+    "Sales Associate",
+    "Security Guard",
+    "Self-Employed",
+    "Warehouse & Logistics",
+    "Welder",
+    "Other"
+].sort();
+
 const JobsDashboard: React.FC = () => {
     const { user } = useAuth();
     const [clients, setClients] = useState<JobClient[]>([]);
@@ -44,6 +82,7 @@ const JobsDashboard: React.FC = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<string | null>(null); // 'industry', 'jobType', 'wage'
     const [editValue, setEditValue] = useState('');
+    const [customIndustry, setCustomIndustry] = useState(''); // For "Other" input
 
     useEffect(() => {
         fetchData();
@@ -159,17 +198,40 @@ const JobsDashboard: React.FC = () => {
     const startEditing = (id: string, field: string, currentValue: string) => {
         setEditingId(id);
         setEditingField(field);
-        setEditValue(currentValue);
+
+        // Handle "Other" logic initialization
+        if (field === 'industry') {
+            if (INDUSTRY_OPTIONS.includes(currentValue)) {
+                setEditValue(currentValue);
+                setCustomIndustry('');
+            } else {
+                setEditValue('Other');
+                setCustomIndustry(currentValue !== 'Unknown' && currentValue !== 'See ISP' ? currentValue : '');
+            }
+        } else {
+            setEditValue(currentValue);
+        }
     };
 
     const saveEdit = async (client: JobClient) => {
         if (!editingField) return;
 
+        let finalValue = editValue;
+        if (editingField === 'industry' && editValue === 'Other') {
+            finalValue = customIndustry;
+            if (!finalValue.trim()) {
+                // Don't save empty "Other"
+                setEditingId(null);
+                setEditingField(null);
+                return;
+            }
+        }
+
         try {
             // Optimistic Update
             setClients(prev => prev.map(c => {
                 if (c.id === client.id) {
-                    return { ...c, [editingField]: editValue };
+                    return { ...c, [editingField]: finalValue };
                 }
                 return c;
             }));
@@ -179,10 +241,10 @@ const JobsDashboard: React.FC = () => {
                 ...(client.demographics || defaultDemographics),
             };
 
-            if (editingField === 'industry') updatedDemographics.jobInterests = editValue;
-            if (editingField === 'jobType') updatedDemographics.desiredJobType = editValue as any;
-            if (editingField === 'desiredWage') updatedDemographics.desiredWage = editValue;
-            if (editingField === 'status') updatedDemographics.jobSearchStatus = editValue as any;
+            if (editingField === 'industry') updatedDemographics.jobInterests = finalValue;
+            if (editingField === 'jobType') updatedDemographics.desiredJobType = finalValue as any;
+            if (editingField === 'desiredWage') updatedDemographics.desiredWage = finalValue;
+            if (editingField === 'status') updatedDemographics.jobSearchStatus = finalValue as any;
 
             const cleanClient: Client = {
                 id: client.id,
@@ -200,6 +262,7 @@ const JobsDashboard: React.FC = () => {
             await api.updateClient(cleanClient);
             setEditingId(null);
             setEditingField(null);
+            setCustomIndustry('');
 
         } catch (error) {
             console.error("Save failed", error);
@@ -247,7 +310,11 @@ const JobsDashboard: React.FC = () => {
     const getSortedClients = () => {
         let filtered = clients.filter(client => {
             const matchesSearch = (client.profile.firstName + ' ' + client.profile.lastName).toLowerCase().includes(searchTerm.toLowerCase());
+
+            // Allow matching "Other" industries that aren't in the list? 
+            // Or just string match whatever is in client.industry (which is correct)
             const matchesIndustry = industryFilter === 'All Industries' || client.industry.toLowerCase().includes(industryFilter.toLowerCase());
+
             const matchesStatus = statusFilter === 'All Statuses' || client.status === statusFilter;
             return matchesSearch && matchesIndustry && matchesStatus;
         });
@@ -266,7 +333,10 @@ const JobsDashboard: React.FC = () => {
         });
     };
 
-    const industries = Array.from(new Set(clients.map(c => c.industry))).filter(i => i !== 'Unknown').sort();
+    // Need a unified list for filter? Or just use what's in use?
+    // User probably wants to filter by the fixed options too? 
+    // Let's stick to "Used Industries" for the filter to keep it relevant to data.
+    const usedIndustries = Array.from(new Set(clients.map(c => c.industry))).filter(i => i !== 'Unknown').sort();
 
     const renderWorkshopIcon = (completed: boolean) => {
         return completed ? <Check className="w-5 h-5 text-green-500 font-bold" /> : <X className="w-5 h-5 text-red-500/50" />;
@@ -316,7 +386,7 @@ const JobsDashboard: React.FC = () => {
                         onChange={(e) => setIndustryFilter(e.target.value)}
                     >
                         <option>All Industries</option>
-                        {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                        {usedIndustries.map(i => <option key={i} value={i}>{i}</option>)}
                     </select>
                 </div>
                 <div className="flex items-center space-x-2 bg-white rounded px-3 py-2">
@@ -382,16 +452,35 @@ const JobsDashboard: React.FC = () => {
                                     </div>
                                 </td>
 
+                                {/* Industry (Editable with Dropdown + Other) */}
                                 <td className="px-6 py-4">
                                     {editingId === client.id && editingField === 'industry' ? (
-                                        <input
-                                            autoFocus
-                                            className="border-b border-blue-500 focus:outline-none w-full text-sm"
-                                            value={editValue}
-                                            onChange={(e) => setEditValue(e.target.value)}
-                                            onBlur={() => saveEdit(client)}
-                                            onKeyDown={(e) => e.key === 'Enter' && saveEdit(client)}
-                                        />
+                                        <div className="flex flex-col space-y-2">
+                                            <select
+                                                autoFocus
+                                                className="border-b border-blue-500 focus:outline-none w-full text-sm py-1"
+                                                value={editValue}
+                                                onChange={(e) => setEditValue(e.target.value)}
+                                                onBlur={(e) => {
+                                                    // Only blur if we aren't clicking the custom input
+                                                    if (e.target.value !== 'Other') saveEdit(client);
+                                                }}
+                                            >
+                                                <option disabled value="">Select Industry...</option>
+                                                {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                            {editValue === 'Other' && (
+                                                <input
+                                                    autoFocus
+                                                    placeholder="Specify Industry..."
+                                                    className="border-b border-blue-500 focus:outline-none w-full text-sm mt-1"
+                                                    value={customIndustry}
+                                                    onChange={(e) => setCustomIndustry(e.target.value)}
+                                                    onBlur={() => saveEdit(client)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && saveEdit(client)}
+                                                />
+                                            )}
+                                        </div>
                                     ) : (
                                         <div onClick={() => startEditing(client.id, 'industry', client.industry)} className="cursor-pointer group">
                                             <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100 group-hover:bg-blue-100">
