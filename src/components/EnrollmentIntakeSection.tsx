@@ -4,6 +4,7 @@ import api, { defaultDemographics } from '../lib/firebase';
 import { Save, AlertCircle, CheckCircle } from 'lucide-react';
 import AttachmentsSection from './Attachments/AttachmentsSection';
 import Card from './Card';
+import { INDUSTRY_OPTIONS } from '../constants'; // Import shared constants
 
 interface EnrollmentIntakeSectionProps {
     client: Client;
@@ -119,6 +120,61 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
         }
     };
 
+    // --- Helper for Industry Multi-Select ---
+    const toggleIndustry = (option: string) => {
+        if (!formData) return;
+
+        let currentString = formData.jobInterests || "";
+        let selected = currentString.split(',').map(s => s.trim()).filter(s => s && s !== 'Unknown');
+
+        if (selected.includes(option)) {
+            selected = selected.filter(s => s !== option);
+        } else {
+            selected.push(option);
+        }
+
+        const newString = selected.join(', ');
+        handleRootChange('jobInterests', newString);
+    };
+
+    const handleCustomIndustryChange = (value: string) => {
+        if (!formData) return;
+
+        let currentString = formData.jobInterests || "";
+        let selected = currentString.split(',').map(s => s.trim()).filter(s => s && s !== 'Unknown');
+
+        // Remove old 'custom' parts (those not in the list)
+        const standard = selected.filter(s => INDUSTRY_OPTIONS.includes(s) && s !== 'Other');
+
+        // Add new custom value if 'Other' is checked (controlled by rendering logic below, usually)
+        // But here we might just want to append. 
+        // A cleaner way for the form is to separate standard and custom in UI but join in storage.
+    };
+
+    // Simplified approach: Custom Input adds to list? 
+    // Or just let user manage the string directly if "Other" is complex? 
+    // Let's stick to the Checkbox UI + Other Input style.
+
+    const getSelectedIndustries = () => {
+        if (!formData?.jobInterests) return [];
+        return formData.jobInterests.split(',').map(s => s.trim());
+    };
+
+    const getCustomIndustryValue = () => {
+        const selected = getSelectedIndustries();
+        const custom = selected.filter(s => !INDUSTRY_OPTIONS.includes(s) && s !== 'Other');
+        return custom.join(', ');
+    };
+
+    const updateCustomIndustry = (value: string) => {
+        const selected = getSelectedIndustries().filter(s => INDUSTRY_OPTIONS.includes(s)); // Keep only standard
+        if (value.trim()) {
+            selected.push(value.trim()); // Add new custom
+        }
+        handleRootChange('jobInterests', selected.join(', '));
+    };
+
+
     if (!formData) {
         return <div className="p-4 text-red-600">Error: Demographics data is missing and defaults failed to load.</div>;
     }
@@ -141,6 +197,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                 className="hidden"
                                 disabled={loading}
                                 onChange={async (e) => {
+                                    /* ... (Existing Auto-OCR logic unchanged) ... */
                                     if (e.target.files && e.target.files[0]) {
                                         const file = e.target.files[0];
                                         setLoading(true);
@@ -148,13 +205,11 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                         setSuccess(null);
                                         try {
                                             const extractedData = await api.extractFormData(file, 'Intake');
-                                            // Merge extracted data
                                             setFormData(prev => {
                                                 if (!prev) return extractedData;
                                                 return {
                                                     ...prev,
                                                     ...extractedData,
-                                                    // Deep merge for nested objects if needed, but top-level spread + manual merge below is safer
                                                     publicAssistance: { ...prev.publicAssistance, ...(extractedData.publicAssistance || {}) },
                                                     barriersToEmployment: { ...prev.barriersToEmployment, ...(extractedData.barriersToEmployment || {}) },
                                                     supportServices: { ...prev.supportServices, ...(extractedData.supportServices || {}) },
@@ -171,7 +226,6 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                             setError("Failed to auto-fill form: " + (err.message || "Unknown error"));
                                         } finally {
                                             setLoading(false);
-                                            // Clear input value to allow re-upload ensuring onChange fires
                                             e.target.value = '';
                                         }
                                     }
@@ -189,13 +243,13 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                 }
             >
                 <div className="space-y-8">
+                    {/* ... Errors/Success ... */}
                     {error && (
                         <div className="bg-red-50 border-l-4 border-red-500 p-4 flex items-center text-red-700">
                             <AlertCircle className="w-5 h-5 mr-2" />
                             {error}
                         </div>
                     )}
-
                     {success && (
                         <div className="bg-green-50 border-l-4 border-green-500 p-4 flex items-center text-green-700">
                             <CheckCircle className="w-5 h-5 mr-2" />
@@ -203,32 +257,16 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                         </div>
                     )}
 
+
                     {/* Section 1: Contact Information (Read-Only) */}
                     <section className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-700 border-b pb-2">Section 1: Contact Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <label className="block text-gray-500">Full Name</label>
-                                <div className="font-medium">{client.profile.firstName} {client.profile.lastName}</div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-500">Date of Birth</label>
-                                <div className="font-medium">{client.profile.dob || 'N/A'}</div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-500">Phone Number</label>
-                                <div className="font-medium">{client.contactInfo.phone}</div>
-                            </div>
-                            <div>
-                                <label className="block text-gray-500">Email Address</label>
-                                <div className="font-medium">{client.contactInfo.email || 'N/A'}</div>
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-gray-500">Address</label>
-                                <div className="font-medium">
-                                    {client.contactInfo.street} {client.contactInfo.apt ? `Apt ${client.contactInfo.apt}` : ''}, {client.contactInfo.city}, {client.contactInfo.state} {client.contactInfo.zip}
-                                </div>
-                            </div>
+                            <div><label className="block text-gray-500">Full Name</label><div className="font-medium">{client.profile.firstName} {client.profile.lastName}</div></div>
+                            <div><label className="block text-gray-500">Date of Birth</label><div className="font-medium">{client.profile.dob || 'N/A'}</div></div>
+                            <div><label className="block text-gray-500">Phone Number</label><div className="font-medium">{client.contactInfo.phone}</div></div>
+                            <div><label className="block text-gray-500">Email Address</label><div className="font-medium">{client.contactInfo.email || 'N/A'}</div></div>
+                            <div className="md:col-span-2"><label className="block text-gray-500">Address</label><div className="font-medium">{client.contactInfo.street} {client.contactInfo.apt ? `Apt ${client.contactInfo.apt}` : ''}, {client.contactInfo.city}, {client.contactInfo.state} {client.contactInfo.zip}</div></div>
                         </div>
                     </section>
 
@@ -238,27 +276,16 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="residentOfShastaCounty"
-                                    checked={formData.residentOfShastaCounty}
-                                    onChange={(e) => handleRootChange('residentOfShastaCounty', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
+                                <input type="checkbox" id="residentOfShastaCounty" checked={formData.residentOfShastaCounty} onChange={(e) => handleRootChange('residentOfShastaCounty', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
                                 <label htmlFor="residentOfShastaCounty" className="text-gray-700">Resident of Shasta County?</label>
                             </div>
                             <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="currentlyEmployed"
-                                    checked={formData.currentlyEmployed}
-                                    onChange={(e) => handleRootChange('currentlyEmployed', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
+                                <input type="checkbox" id="currentlyEmployed" checked={formData.currentlyEmployed} onChange={(e) => handleRootChange('currentlyEmployed', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
                                 <label htmlFor="currentlyEmployed" className="text-gray-700">Currently Employed?</label>
                             </div>
                         </div>
 
+                        {/* Public Assistance & Barriers - Keeping existing logic */}
                         <div className="space-y-2">
                             <label className="block font-medium text-gray-700">Public Assistance (Check all that apply):</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -266,13 +293,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                     if (key === 'other') return null;
                                     return (
                                         <div key={key} className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                id={`pa-${key}`}
-                                                checked={value as boolean}
-                                                onChange={(e) => handleChange('publicAssistance', key, e.target.checked)}
-                                                className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
+                                            <input type="checkbox" id={`pa-${key}`} checked={value as boolean} onChange={(e) => handleChange('publicAssistance', key, e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
                                             <label htmlFor={`pa-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
                                         </div>
                                     );
@@ -280,13 +301,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                             </div>
                             <div className="flex items-center space-x-2 mt-2">
                                 <label htmlFor="pa-other" className="text-sm text-gray-700">Other:</label>
-                                <input
-                                    type="text"
-                                    id="pa-other"
-                                    value={formData.publicAssistance.other}
-                                    onChange={(e) => handleChange('publicAssistance', 'other', e.target.value)}
-                                    className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1"
-                                />
+                                <input type="text" id="pa-other" value={formData.publicAssistance.other} onChange={(e) => handleChange('publicAssistance', 'other', e.target.value)} className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1" />
                             </div>
                         </div>
 
@@ -297,13 +312,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                     if (key === 'other') return null;
                                     return (
                                         <div key={key} className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                id={`barrier-${key}`}
-                                                checked={value as boolean}
-                                                onChange={(e) => handleChange('barriersToEmployment', key, e.target.checked)}
-                                                className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
+                                            <input type="checkbox" id={`barrier-${key}`} checked={value as boolean} onChange={(e) => handleChange('barriersToEmployment', key, e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
                                             <label htmlFor={`barrier-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
                                         </div>
                                     );
@@ -311,13 +320,7 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                             </div>
                             <div className="flex items-center space-x-2 mt-2">
                                 <label htmlFor="barrier-other" className="text-sm text-gray-700">Other:</label>
-                                <input
-                                    type="text"
-                                    id="barrier-other"
-                                    value={formData.barriersToEmployment.other}
-                                    onChange={(e) => handleChange('barriersToEmployment', 'other', e.target.value)}
-                                    className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1"
-                                />
+                                <input type="text" id="barrier-other" value={formData.barriersToEmployment.other} onChange={(e) => handleChange('barriersToEmployment', 'other', e.target.value)} className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1" />
                             </div>
                         </div>
                     </section>
@@ -325,14 +328,10 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                     {/* Section 3: Education & Training Interests */}
                     <section className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-700 border-b pb-2">Section 3: Education & Training Interests</h3>
-
+                        {/* Higher Ed Level */}
                         <div>
                             <label className="block font-medium text-gray-700 mb-2">Highest Level of Education Completed:</label>
-                            <select
-                                value={formData.educationLevel}
-                                onChange={(e) => handleRootChange('educationLevel', e.target.value)}
-                                className="w-full md:w-1/2 p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            >
+                            <select value={formData.educationLevel} onChange={(e) => handleRootChange('educationLevel', e.target.value)} className="w-full md:w-1/2 p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 <option value="No High School Diploma">No High School Diploma</option>
                                 <option value="GED">GED</option>
                                 <option value="High School Diploma">High School Diploma</option>
@@ -342,61 +341,50 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                                 <option value="Other">Other</option>
                             </select>
                             {formData.educationLevel === 'Other' && (
-                                <input
-                                    type="text"
-                                    placeholder="Please specify"
-                                    value={formData.educationOther || ''}
-                                    onChange={(e) => handleRootChange('educationOther', e.target.value)}
-                                    className="mt-2 w-full md:w-1/2 p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                />
+                                <input type="text" placeholder="Please specify" value={formData.educationOther || ''} onChange={(e) => handleRootChange('educationOther', e.target.value)} className="mt-2 w-full md:w-1/2 p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" />
                             )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="currentlyEnrolled"
-                                    checked={formData.currentlyEnrolled}
-                                    onChange={(e) => handleRootChange('currentlyEnrolled', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label htmlFor="currentlyEnrolled" className="text-gray-700">Currently enrolled in school/training?</label>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="hasResume"
-                                    checked={formData.hasResume}
-                                    onChange={(e) => handleRootChange('hasResume', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label htmlFor="hasResume" className="text-gray-700">Do you have a resume?</label>
-                            </div>
-                            <div className="flex items-center space-x-3">
-                                <input
-                                    type="checkbox"
-                                    id="interestedInTraining"
-                                    checked={formData.interestedInTraining}
-                                    onChange={(e) => handleRootChange('interestedInTraining', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label htmlFor="interestedInTraining" className="text-gray-700">Interested in job training?</label>
-                            </div>
+                            <div className="flex items-center space-x-3"><input type="checkbox" id="currentlyEnrolled" checked={formData.currentlyEnrolled} onChange={(e) => handleRootChange('currentlyEnrolled', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label htmlFor="currentlyEnrolled" className="text-gray-700">Currently enrolled in school/training?</label></div>
+                            <div className="flex items-center space-x-3"><input type="checkbox" id="hasResume" checked={formData.hasResume} onChange={(e) => handleRootChange('hasResume', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label htmlFor="hasResume" className="text-gray-700">Do you have a resume?</label></div>
+                            <div className="flex items-center space-x-3"><input type="checkbox" id="interestedInTraining" checked={formData.interestedInTraining} onChange={(e) => handleRootChange('interestedInTraining', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label htmlFor="interestedInTraining" className="text-gray-700">Interested in job training?</label></div>
                         </div>
 
-                        <div>
-                            <label className="block font-medium text-gray-700 mb-1">Job/Career Fields of Interest:</label>
-                            <input
-                                type="text"
-                                value={formData.jobInterests}
-                                onChange={(e) => handleRootChange('jobInterests', e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            />
+                        {/* REPLACED Industry Text with Checkboxes */}
+                        <div className="space-y-2">
+                            <label className="block font-medium text-gray-700 mb-1">Job/Career Fields of Interest (Check all that apply):</label>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-2 gap-x-4 max-h-96 overflow-y-auto p-2 border rounded-md bg-gray-50">
+                                {INDUSTRY_OPTIONS.filter(i => i !== 'Other').map(industry => (
+                                    <div key={industry} className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            id={`industry-${industry}`}
+                                            checked={getSelectedIndustries().includes(industry)}
+                                            onChange={() => toggleIndustry(industry)}
+                                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor={`industry-${industry}`} className="text-sm text-gray-700">{industry}</label>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Other Industry Input */}
+                            <div className="flex items-center space-x-2 mt-2">
+                                <label className="text-sm text-gray-700 font-medium">Other:</label>
+                                <input
+                                    type="text"
+                                    placeholder="Specify other interests..."
+                                    value={getCustomIndustryValue()}
+                                    onChange={(e) => updateCustomIndustry(e.target.value)}
+                                    className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1"
+                                />
+                            </div>
                         </div>
                     </section>
 
-                    {/* Section 4: Support Services */}
+                    {/* Section 4: Support Services - Unchanged */}
                     <section className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-700 border-b pb-2">Section 4: Support Services</h3>
                         <div className="space-y-2">
@@ -404,125 +392,32 @@ const EnrollmentIntakeSection: React.FC<EnrollmentIntakeSectionProps> = ({ clien
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {Object.entries(formData.supportServices || {}).map(([key, value]) => {
                                     if (key === 'other') return null;
-                                    return (
-                                        <div key={key} className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                id={`support-${key}`}
-                                                checked={value as boolean}
-                                                onChange={(e) => handleChange('supportServices', key, e.target.checked)}
-                                                className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <label htmlFor={`support-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
-                                        </div>
-                                    );
+                                    return (<div key={key} className="flex items-center space-x-2"><input type="checkbox" id={`support-${key}`} checked={value as boolean} onChange={(e) => handleChange('supportServices', key, e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label htmlFor={`support-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label></div>);
                                 })}
                             </div>
-                            <div className="flex items-center space-x-2 mt-2">
-                                <label htmlFor="support-other" className="text-sm text-gray-700">Other:</label>
-                                <input
-                                    type="text"
-                                    id="support-other"
-                                    value={formData.supportServices.other}
-                                    onChange={(e) => handleChange('supportServices', 'other', e.target.value)}
-                                    className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1"
-                                />
-                            </div>
+                            <div className="flex items-center space-x-2 mt-2"><label htmlFor="support-other" className="text-sm text-gray-700">Other:</label><input type="text" id="support-other" value={formData.supportServices.other} onChange={(e) => handleChange('supportServices', 'other', e.target.value)} className="flex-1 border-b border-gray-300 focus:border-blue-500 outline-none text-sm py-1" /></div>
                         </div>
                     </section>
 
-                    {/* Section 5: Demographics (Income, Race, etc.) */}
+                    {/* Section 5: Demographics - Unchanged */}
                     <section className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-700 border-b pb-2">Section 5: Demographics & Income</h3>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Applicant Name (Self-Certification)</label>
-                                <input
-                                    type="text"
-                                    value={formData.incomeCertification.applicantName}
-                                    onChange={(e) => handleChange('incomeCertification', 'applicantName', e.target.value)}
-                                    className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Household Size</label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    value={formData.incomeCertification.householdSize}
-                                    onChange={(e) => handleChange('incomeCertification', 'householdSize', parseInt(e.target.value) || 1)}
-                                    className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Annual Household Income ($)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    value={formData.incomeCertification.annualIncome}
-                                    onChange={(e) => handleChange('incomeCertification', 'annualIncome', parseInt(e.target.value) || 0)}
-                                    className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                />
-                            </div>
+                            <div><label className="block text-sm font-medium text-gray-700">Applicant Name (Self-Certification)</label><input type="text" value={formData.incomeCertification.applicantName} onChange={(e) => handleChange('incomeCertification', 'applicantName', e.target.value)} className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" /></div>
+                            <div><label className="block text-sm font-medium text-gray-700">Household Size</label><input type="number" min="1" value={formData.incomeCertification.householdSize} onChange={(e) => handleChange('incomeCertification', 'householdSize', parseInt(e.target.value) || 1)} className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" /></div>
+                            <div><label className="block text-sm font-medium text-gray-700">Annual Household Income ($)</label><input type="number" min="0" value={formData.incomeCertification.annualIncome} onChange={(e) => handleChange('incomeCertification', 'annualIncome', parseInt(e.target.value) || 0)} className="mt-1 w-full p-2 border border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500" /></div>
                         </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.incomeCertification.femaleHeadOfHousehold}
-                                    onChange={(e) => handleChange('incomeCertification', 'femaleHeadOfHousehold', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label className="text-sm text-gray-700">Female Head of Household</label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.incomeCertification.seniorHeadOfHousehold}
-                                    onChange={(e) => handleChange('incomeCertification', 'seniorHeadOfHousehold', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label className="text-sm text-gray-700">Senior Head of Household (62+)</label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.incomeCertification.singleParentFamily}
-                                    onChange={(e) => handleChange('incomeCertification', 'singleParentFamily', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label className="text-sm text-gray-700">Single Parent Family</label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.incomeCertification.disabledFamilyMember}
-                                    onChange={(e) => handleChange('incomeCertification', 'disabledFamilyMember', e.target.checked)}
-                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <label className="text-sm text-gray-700">Family member with disability</label>
-                            </div>
+                            <div className="flex items-center space-x-2"><input type="checkbox" checked={formData.incomeCertification.femaleHeadOfHousehold} onChange={(e) => handleChange('incomeCertification', 'femaleHeadOfHousehold', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label className="text-sm text-gray-700">Female Head of Household</label></div>
+                            <div className="flex items-center space-x-2"><input type="checkbox" checked={formData.incomeCertification.seniorHeadOfHousehold} onChange={(e) => handleChange('incomeCertification', 'seniorHeadOfHousehold', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label className="text-sm text-gray-700">Senior Head of Household (62+)</label></div>
+                            <div className="flex items-center space-x-2"><input type="checkbox" checked={formData.incomeCertification.singleParentFamily} onChange={(e) => handleChange('incomeCertification', 'singleParentFamily', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label className="text-sm text-gray-700">Single Parent Family</label></div>
+                            <div className="flex items-center space-x-2"><input type="checkbox" checked={formData.incomeCertification.disabledFamilyMember} onChange={(e) => handleChange('incomeCertification', 'disabledFamilyMember', e.target.checked)} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label className="text-sm text-gray-700">Family member with disability</label></div>
                         </div>
-
                         <div>
                             <label className="block font-medium text-gray-700 mb-2">Race & Ethnicity</label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {Object.entries(formData.incomeCertification?.race || {}).map(([key, value]) => (
-                                    <div key={key} className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            id={`race-${key}`}
-                                            checked={value as boolean}
-                                            onChange={(e) => {
-                                                const newRace = { ...(formData.incomeCertification?.race || {}), [key]: e.target.checked };
-                                                handleChange('incomeCertification', 'race', newRace);
-                                            }}
-                                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor={`race-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
-                                    </div>
+                                    <div key={key} className="flex items-center space-x-2"><input type="checkbox" id={`race-${key}`} checked={value as boolean} onChange={(e) => { const newRace = { ...(formData.incomeCertification?.race || {}), [key]: e.target.checked }; handleChange('incomeCertification', 'race', newRace); }} className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" /><label htmlFor={`race-${key}`} className="text-sm text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</label></div>
                                 ))}
                             </div>
                         </div>

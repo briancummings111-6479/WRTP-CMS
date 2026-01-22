@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api, { defaultDemographics } from '../lib/firebase';
 import { Client, Task, User as AppUser, ClientAttachment, ISP, Workshop } from '../types';
 import { Search, Filter, ExternalLink, FileText, CheckCircle, Clock, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, X, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { INDUSTRY_OPTIONS } from '../constants';
 
 interface WorkshopStatus {
     CE: boolean; // Career Explorations
@@ -31,44 +32,6 @@ type SortConfig = {
     direction: 'asc' | 'desc';
 };
 
-const INDUSTRY_OPTIONS = [
-    "Accountant / Bookkeeper",
-    "Apprentice (Electrician, Plumber, HVAC)",
-    "Barista",
-    "Carpenter",
-    "Construction",
-    "Cook",
-    "Cosmetology",
-    "Customer Service",
-    "Delivery Driver",
-    "EMT",
-    "Entrepreneur",
-    "Facilities Maintenance",
-    "Fire Tech",
-    "Flooring Installer",
-    "Flagger",
-    "General Laborer",
-    "Groundskeeper / Landscaper",
-    "Heavy Equipment Operator",
-    "Home Health Aide",
-    "Janitor",
-    "Logging",
-    "Masonry",
-    "Medical Assistant",
-    "Nursing",
-    "Office / Clerical",
-    "Painter/Drywaller",
-    "Phlebotomist",
-    "Restaurant",
-    "Retail",
-    "Sales Associate",
-    "Security Guard",
-    "Self-Employed",
-    "Warehouse & Logistics",
-    "Welder",
-    "Other"
-].sort();
-
 const JobsDashboard: React.FC = () => {
     const { user } = useAuth();
     const [clients, setClients] = useState<JobClient[]>([]);
@@ -82,11 +45,38 @@ const JobsDashboard: React.FC = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<string | null>(null); // 'industry', 'jobType', 'wage'
     const [editValue, setEditValue] = useState('');
+
+    // Multi-Select Industry State
+    const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
     const [customIndustry, setCustomIndustry] = useState(''); // For "Other" input
+    const editContainerRef = useRef<HTMLDivElement>(null);
+
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Close edit on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (editContainerRef.current && !editContainerRef.current.contains(event.target as Node)) {
+                if (editingId) {
+                    saveEdit(clients.find(c => c.id === editingId)!);
+                }
+            }
+        };
+
+        if (editingId) {
+            document.addEventListener("mousedown", handleClickOutside);
+        } else {
+            document.removeEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [editingId, clients, selectedIndustries, customIndustry, editValue]); // Dependencies crucial for saveEdit closure
+
 
     const fetchData = async () => {
         setLoading(true);
@@ -122,9 +112,8 @@ const JobsDashboard: React.FC = () => {
                     else if (client.training?.earlyChildhoodEducationCTE) industry = 'ECE';
                     else if (client.training?.entrepreneurshipCTE) industry = 'Entrepreneurship';
                 }
-                if (industry.includes(',')) {
-                    industry = industry.split(',')[0].trim();
-                }
+
+                // Keep exact string for display/edit, even if comma separated
                 if (!industry && isp && isp.longTermGoals) {
                     industry = "See ISP";
                 }
@@ -199,32 +188,46 @@ const JobsDashboard: React.FC = () => {
         setEditingId(id);
         setEditingField(field);
 
-        // Handle "Other" logic initialization
         if (field === 'industry') {
-            if (INDUSTRY_OPTIONS.includes(currentValue)) {
-                setEditValue(currentValue);
-                setCustomIndustry('');
+            // Parse comma separated values
+            const parts = currentValue.split(',').map(s => s.trim()).filter(s => s && s !== 'Unknown' && s !== 'See ISP');
+
+            const standard = parts.filter(p => INDUSTRY_OPTIONS.includes(p));
+            const others = parts.filter(p => !INDUSTRY_OPTIONS.includes(p));
+
+            if (others.length > 0) {
+                // Assume the custom value is everything else joined back together
+                // Or if "Other" logic was strict, but here we just stash unknowns into custom
+                standard.push('Other');
+                setCustomIndustry(others.join(', '));
             } else {
-                setEditValue('Other');
-                setCustomIndustry(currentValue !== 'Unknown' && currentValue !== 'See ISP' ? currentValue : '');
+                setCustomIndustry('');
             }
+            setSelectedIndustries(standard);
         } else {
             setEditValue(currentValue);
         }
+    };
+
+    const toggleIndustry = (industry: string) => {
+        setSelectedIndustries(prev => {
+            if (prev.includes(industry)) return prev.filter(i => i !== industry);
+            return [...prev, industry];
+        });
     };
 
     const saveEdit = async (client: JobClient) => {
         if (!editingField) return;
 
         let finalValue = editValue;
-        if (editingField === 'industry' && editValue === 'Other') {
-            finalValue = customIndustry;
-            if (!finalValue.trim()) {
-                // Don't save empty "Other"
-                setEditingId(null);
-                setEditingField(null);
-                return;
+
+        if (editingField === 'industry') {
+            const parts = selectedIndustries.filter(i => i !== 'Other');
+            if (selectedIndustries.includes('Other') && customIndustry.trim()) {
+                parts.push(customIndustry.trim());
             }
+            finalValue = parts.join(', ');
+            if (!finalValue) finalValue = ""; // Or Unknown?
         }
 
         try {
@@ -263,6 +266,7 @@ const JobsDashboard: React.FC = () => {
             setEditingId(null);
             setEditingField(null);
             setCustomIndustry('');
+            setSelectedIndustries([]);
 
         } catch (error) {
             console.error("Save failed", error);
@@ -311,8 +315,6 @@ const JobsDashboard: React.FC = () => {
         let filtered = clients.filter(client => {
             const matchesSearch = (client.profile.firstName + ' ' + client.profile.lastName).toLowerCase().includes(searchTerm.toLowerCase());
 
-            // Allow matching "Other" industries that aren't in the list? 
-            // Or just string match whatever is in client.industry (which is correct)
             const matchesIndustry = industryFilter === 'All Industries' || client.industry.toLowerCase().includes(industryFilter.toLowerCase());
 
             const matchesStatus = statusFilter === 'All Statuses' || client.status === statusFilter;
@@ -324,7 +326,6 @@ const JobsDashboard: React.FC = () => {
             const bValue = b[sortConfig.key];
 
             if (aValue === bValue) return 0;
-            // Handle null/undefined 
             if (aValue === null || aValue === undefined) return 1;
             if (bValue === null || bValue === undefined) return -1;
 
@@ -333,10 +334,11 @@ const JobsDashboard: React.FC = () => {
         });
     };
 
-    // Need a unified list for filter? Or just use what's in use?
-    // User probably wants to filter by the fixed options too? 
-    // Let's stick to "Used Industries" for the filter to keep it relevant to data.
-    const usedIndustries = Array.from(new Set(clients.map(c => c.industry))).filter(i => i !== 'Unknown').sort();
+    // Get all unique industries from current clients for the filter dropdown
+    // Split comma separated values
+    const allClientIndustries = clients.flatMap(c => c.industry.split(',').map(s => s.trim())).filter(i => i && i !== 'Unknown' && i !== 'See ISP');
+    const usedIndustries = Array.from(new Set(allClientIndustries)).sort();
+
 
     const renderWorkshopIcon = (completed: boolean) => {
         return completed ? <Check className="w-5 h-5 text-green-500 font-bold" /> : <X className="w-5 h-5 text-red-500/50" />;
@@ -405,7 +407,7 @@ const JobsDashboard: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden pb-40"> {/* Padding bottom for dropdown space */}
                 <table className="min-w-full divide-y divide-gray-100 table-fixed">
                     <thead className="bg-gray-50">
                         <tr>
@@ -452,39 +454,38 @@ const JobsDashboard: React.FC = () => {
                                     </div>
                                 </td>
 
-                                {/* Industry (Editable with Dropdown + Other) */}
-                                <td className="px-6 py-4">
+                                {/* Industry (Multi-Select Editable) */}
+                                <td className="px-6 py-4 relative">
                                     {editingId === client.id && editingField === 'industry' ? (
-                                        <div className="flex flex-col space-y-2">
-                                            <select
-                                                autoFocus
-                                                className="border-b border-blue-500 focus:outline-none w-full text-sm py-1"
-                                                value={editValue}
-                                                onChange={(e) => setEditValue(e.target.value)}
-                                                onBlur={(e) => {
-                                                    // Only blur if we aren't clicking the custom input
-                                                    if (e.target.value !== 'Other') saveEdit(client);
-                                                }}
-                                            >
-                                                <option disabled value="">Select Industry...</option>
-                                                {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                            </select>
-                                            {editValue === 'Other' && (
+                                        <div ref={editContainerRef} className="absolute z-10 bg-white border border-blue-500 shadow-lg p-2 rounded w-64 mt-1 max-h-60 overflow-y-auto">
+                                            <div className="space-y-1">
+                                                {INDUSTRY_OPTIONS.map(opt => (
+                                                    <label key={opt} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIndustries.includes(opt)}
+                                                            onChange={() => toggleIndustry(opt)}
+                                                            className="rounded text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <span>{opt}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            {selectedIndustries.includes('Other') && (
                                                 <input
                                                     autoFocus
                                                     placeholder="Specify Industry..."
-                                                    className="border-b border-blue-500 focus:outline-none w-full text-sm mt-1"
+                                                    className="border-b border-blue-300 focus:outline-none w-full text-sm mt-2 p-1 bg-gray-50"
                                                     value={customIndustry}
                                                     onChange={(e) => setCustomIndustry(e.target.value)}
-                                                    onBlur={() => saveEdit(client)}
                                                     onKeyDown={(e) => e.key === 'Enter' && saveEdit(client)}
                                                 />
                                             )}
                                         </div>
                                     ) : (
                                         <div onClick={() => startEditing(client.id, 'industry', client.industry)} className="cursor-pointer group">
-                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100 group-hover:bg-blue-100">
-                                                {client.industry}
+                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100 group-hover:bg-blue-100 block truncate" title={client.industry}>
+                                                {client.industry || 'Select...'}
                                             </span>
                                         </div>
                                     )}
@@ -505,6 +506,9 @@ const JobsDashboard: React.FC = () => {
                                             <option value="Any">Any</option>
                                         </select>
                                     ) : (
+                                        // Use editContainerRef here too for consistency if we wanted, 
+                                        // but simple inputs are fine with standard onBlur/Auto-focus behavior usually.
+                                        // Keeping simple approach for non-custom fields.
                                         <div onClick={() => startEditing(client.id, 'jobType', client.jobType)} className="cursor-pointer hover:text-blue-600 border-b border-transparent hover:border-blue-300 inline-block">
                                             {client.jobType}
                                         </div>
