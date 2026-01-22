@@ -191,6 +191,7 @@ export interface Client {
     dateApplication?: number; // Timestamp - Added
     dateWithdrew?: number; // Timestamp - Added
     initialAppointmentDate?: number; // Timestamp - Added
+    wrtpEligibility?: 'Eligible' | 'Income Ineligible'; // Added
   };
 }
 

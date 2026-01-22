@@ -157,6 +157,14 @@ const EditClientModal: React.FC<EditClientModalProps> = ({ isOpen, onClose, clie
                   </select>
                 </div>
                 <div>
+                  <label className="label">WRTP Eligibility</label>
+                  <select name="metadata.wrtpEligibility" value={formData.metadata.wrtpEligibility || ''} onChange={handleMetadataChange} className="form-input">
+                    <option value="">Select...</option>
+                    <option value="Eligible">Eligible</option>
+                    <option value="Income Ineligible">Income Ineligible</option>
+                  </select>
+                </div>
+                <div>
                   <label className="label">Assigned Case Manager</label>
                   <select
                     name="metadata.assignedAdminId"

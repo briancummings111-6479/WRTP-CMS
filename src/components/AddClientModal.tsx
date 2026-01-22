@@ -76,6 +76,7 @@ const getInitialFormData = () => ({
         clientType: 'General Population' as Client['metadata']['clientType'],
         status: 'Prospect' as Client['metadata']['status'],
         dateApplication: toInputDateString(Date.now()), // toInputDateString handles Date.now correctly for "Today"
+        wrtpEligibility: '',
     },
 });
 
@@ -226,6 +227,14 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                 </div>
                                 <div><label className="label">Date Added</label><input type="date" name="dateApplication" value={formData.metadata.dateApplication} onChange={handleMetadataChange} className="form-input" /></div>
                                 <div><label className="label">Client Type</label><select name="clientType" value={formData.metadata.clientType} onChange={handleMetadataChange} className="form-input"><option value="General Population">General Population</option><option value="CHYBA">CHYBA</option></select></div>
+                                <div>
+                                    <label className="label">WRTP Eligibility</label>
+                                    <select name="wrtpEligibility" value={formData.metadata.wrtpEligibility || ''} onChange={handleMetadataChange} className="form-input">
+                                        <option value="">Select...</option>
+                                        <option value="Eligible">Eligible</option>
+                                        <option value="Income Ineligible">Income Ineligible</option>
+                                    </select>
+                                </div>
                                 {/* Removed 'required' from Assigned Case Manager */}
                                 <div>
                                     <label className="label">Assigned Case Manager</label>
