@@ -174,8 +174,14 @@ const JobsDashboard: React.FC = () => {
                 };
             }));
 
-            // Filter out inactive unless they are explicitly Hired/Searching via new status
-            setClients(processedClients.filter(c => c.metadata.status !== 'Inactive' || c.status === 'Hired'));
+            // Filter logic: Respect explicit "Add to Jobs Dashboard" flag if present.
+            // Fallback to legacy logic (Active or Hired) if the flag is undefined.
+            setClients(processedClients.filter(c => {
+                const explicit = c.training?.addToJobsDashboard;
+                if (explicit !== undefined) return explicit;
+
+                return c.metadata.status !== 'Inactive' || c.status === 'Hired';
+            }));
         } catch (error) {
             console.error("Failed to load dashboard data", error);
         } finally {
@@ -347,30 +353,30 @@ const JobsDashboard: React.FC = () => {
     if (loading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
 
     return (
-        <div className="p-6 max-w-[1600px] mx-auto bg-[#F4F7F6] min-h-screen font-sans">
-            <div className="flex justify-between items-end mb-8">
+        <div className="p-4 md:p-6 max-w-[1600px] mx-auto bg-[#F4F7F6] min-h-screen font-sans">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-[#404E3B] mb-2">Jobs Dashboard</h1>
                     <p className="text-gray-500">Active placement tracking and strategic intervention metrics.</p>
                 </div>
-                <div className="flex space-x-4 bg-white p-2 rounded-lg shadow-sm">
-                    <div className="px-6 py-2 border-r border-gray-100 text-center">
+                <div className="flex space-x-4 bg-white p-2 rounded-lg shadow-sm self-start md:self-auto overflow-x-auto max-w-full">
+                    <div className="px-4 md:px-6 py-2 border-r border-gray-100 text-center min-w-[100px]">
                         <div className="text-2xl font-bold text-blue-600">{clients.filter(c => c.status === 'Searching').length}</div>
                         <div className="text-xs text-gray-400 uppercase tracking-wider">Searching</div>
                     </div>
-                    <div className="px-6 py-2 border-r border-gray-100 text-center">
+                    <div className="px-4 md:px-6 py-2 border-r border-gray-100 text-center min-w-[100px]">
                         <div className="text-2xl font-bold text-purple-600">{clients.filter(c => c.status === 'Interviewing').length}</div>
                         <div className="text-xs text-gray-400 uppercase tracking-wider">Interviews</div>
                     </div>
-                    <div className="px-6 py-2 text-center">
+                    <div className="px-4 md:px-6 py-2 text-center min-w-[100px]">
                         <div className="text-2xl font-bold text-green-600">{clients.filter(c => c.status === 'Hired').length}</div>
                         <div className="text-xs text-gray-400 uppercase tracking-wider">Hired (Active)</div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-[#5a6e69] p-4 rounded-lg shadow-sm mb-6 flex space-x-4 items-center">
-                <div className="relative flex-1">
+            <div className="bg-[#5a6e69] p-4 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 items-center">
+                <div className="relative w-full md:flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                     <input
                         type="text"
@@ -380,34 +386,36 @@ const JobsDashboard: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="flex items-center space-x-2 bg-white rounded px-3 py-2">
-                    <Filter className="text-gray-400 h-4 w-4" />
-                    <select
-                        className="bg-transparent focus:outline-none text-sm text-gray-700"
-                        value={industryFilter}
-                        onChange={(e) => setIndustryFilter(e.target.value)}
-                    >
-                        <option>All Industries</option>
-                        {INDUSTRY_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
-                    </select>
-                </div>
-                <div className="flex items-center space-x-2 bg-white rounded px-3 py-2">
-                    <select
-                        className="bg-transparent focus:outline-none text-sm text-gray-700"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                        <option>All Statuses</option>
-                        <option value="Searching">Searching</option>
-                        <option value="Interviewing">Interviewing</option>
-                        <option value="Offer Received">Offer Received</option>
-                        <option value="Hired">Hired</option>
-                        <option value="Not Searching">Not Searching</option>
-                    </select>
+                <div className="flex space-x-2 w-full md:w-auto">
+                    <div className="flex items-center space-x-2 bg-white rounded px-3 py-2 flex-1 md:flex-none">
+                        <Filter className="text-gray-400 h-4 w-4" />
+                        <select
+                            className="bg-transparent focus:outline-none text-sm text-gray-700 w-full md:w-auto"
+                            value={industryFilter}
+                            onChange={(e) => setIndustryFilter(e.target.value)}
+                        >
+                            <option>All Industries</option>
+                            {INDUSTRY_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-white rounded px-3 py-2 flex-1 md:flex-none">
+                        <select
+                            className="bg-transparent focus:outline-none text-sm text-gray-700 w-full md:w-auto"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option>All Statuses</option>
+                            <option value="Searching">Searching</option>
+                            <option value="Interviewing">Interviewing</option>
+                            <option value="Offer Received">Offer Received</option>
+                            <option value="Hired">Hired</option>
+                            <option value="Not Searching">Not Searching</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden pb-40"> {/* Padding bottom for dropdown space */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden pb-40 overflow-x-auto"> {/* Padding bottom for dropdown space + scroll */}
                 <table className="min-w-full divide-y divide-gray-100 table-fixed">
                     <thead className="bg-gray-50">
                         <tr>

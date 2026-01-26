@@ -474,6 +474,7 @@ const ClientDashboardPage: React.FC = () => {
 
   const subscriptionMap: { key: TrainingBooleanKeys, label: string }[] = [
     { key: 'currentJobListingsEmail', label: 'Current Job Listings Email' },
+    { key: 'addToJobsDashboard', label: 'Add to Jobs Dashboard' },
   ];
 
   if (loading) return <div>Loading client data...</div>;

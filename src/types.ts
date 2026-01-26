@@ -174,6 +174,7 @@ export interface Client {
     coverLetter?: boolean;
     // Subscriptions
     currentJobListingsEmail?: boolean;
+    addToJobsDashboard?: boolean;
   };
 
   demographics?: Demographics;
