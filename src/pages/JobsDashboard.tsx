@@ -134,8 +134,14 @@ const JobsDashboard: React.FC = () => {
                 // 7. Status Mapping
                 let status: JobClient['status'] = client.demographics?.jobSearchStatus || 'Unknown';
                 if (status === 'Unknown') {
-                    if (client.metadata.status === 'Inactive') status = 'Hired';
-                    else status = 'Searching';
+                    // If explicitly added to dashboard, default to 'Searching'
+                    if (client.training?.addToJobsDashboard) {
+                        status = 'Searching';
+                    } else if (client.metadata.status === 'Inactive') {
+                        status = 'Hired';
+                    } else {
+                        status = 'Searching';
+                    }
                 }
 
                 // 8. Last Check-in
