@@ -431,7 +431,7 @@ const JobsDashboard: React.FC = () => {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-1/5">Participant</th>
-                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-1/6">Employment Industry</th>
+                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-64">Employment Industry</th>
                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-24">FT / PT</th>
                             <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-32">Min Desired Wage</th>
 
@@ -503,7 +503,7 @@ const JobsDashboard: React.FC = () => {
                                         </div>
                                     ) : (
                                         <div onClick={() => startEditing(client.id, 'industry', client.industry)} className="cursor-pointer group">
-                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100 group-hover:bg-blue-100 block truncate" title={client.industry}>
+                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-100 group-hover:bg-blue-100 block" title={client.industry}>
                                                 {client.industry || 'Select...'}
                                             </span>
                                         </div>
