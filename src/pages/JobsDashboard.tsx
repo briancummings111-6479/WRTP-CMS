@@ -133,11 +133,16 @@ const JobsDashboard: React.FC = () => {
 
                 // 7. Status Mapping
                 let status: JobClient['status'] = client.demographics?.jobSearchStatus || 'Unknown';
-                if (status === 'Unknown') {
-                    // If explicitly added to dashboard, default to 'Searching'
-                    if (client.training?.addToJobsDashboard) {
+
+                if (client.training?.addToJobsDashboard) {
+                    // If explicitly added, ensure they are visible in the default "Searching" view
+                    // unless they are explicitly set to another active status like Interviewing/Hired.
+                    if (status === 'Unknown' || status === 'Not Searching') {
                         status = 'Searching';
-                    } else if (client.metadata.status === 'Inactive') {
+                    }
+                } else if (status === 'Unknown') {
+                    // Legacy fallback logic
+                    if (client.metadata.status === 'Inactive') {
                         status = 'Hired';
                     } else {
                         status = 'Searching';
