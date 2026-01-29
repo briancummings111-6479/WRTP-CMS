@@ -22,3 +22,4 @@ export * from "./ocr";
 export * from "./summary";
 export * from "./analysis";
 export * from "./query";
+export * from "./email";

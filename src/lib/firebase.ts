@@ -68,9 +68,9 @@ const functions: Functions = getFunctions(app);
 const analytics: Analytics = getAnalytics(app);
 
 // Connect to emulators if working locally
-if (location.hostname === "localhost") {
-  connectFunctionsEmulator(functions, "localhost", 5001);
-}
+// if (location.hostname === "localhost") {
+//   connectFunctionsEmulator(functions, "localhost", 5001);
+// }
 
 // --- Default Values ---
 const defaultDemographics: Demographics = {
@@ -693,11 +693,16 @@ const api = {
     return result.data as { summary: string, caseNoteCount?: number, workshopCount?: number };
   },
 
-  // --- AI Knowledge Base Query ---
   queryKnowledgeBase: async (query: string, timeRangeMonths: number = 12): Promise<{ answer: string }> => {
     const fn = httpsCallable(functions, 'queryKnowledgeBase');
     const result = await fn({ query, timeRangeMonths });
     return result.data as { answer: string };
+  },
+
+  // --- Email Functions ---
+  sendEmail: async (to: string, subject: string, html: string): Promise<void> => {
+    const fn = httpsCallable(functions, 'sendEmailNotification');
+    await fn({ to, subject, html });
   },
 
   // --- Grant Report Helpers ---

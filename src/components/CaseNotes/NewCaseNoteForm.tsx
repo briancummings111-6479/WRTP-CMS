@@ -35,7 +35,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
     const [submitting, setSubmitting] = useState(false);
 
     // New state for Author dropdown
-    const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string }[]>([]);
+    const [staffMembers, setStaffMembers] = useState<{ uid: string; name: string; email: string }[]>([]);
     const [selectedAuthorId, setSelectedAuthorId] = useState<string>('');
     const [detectedMentions, setDetectedMentions] = useState<{ uid: string; name: string }[]>([]);
 
@@ -61,7 +61,7 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
         const fetchStaff = async () => {
             try {
                 const staff = await api.getStaffUsers();
-                setStaffMembers(staff.map(s => ({ uid: s.uid, name: s.name })));
+                setStaffMembers(staff.map(s => ({ uid: s.uid, name: s.name, email: s.email })));
             } catch (error) {
                 console.error("Failed to fetch staff members", error);
             }
@@ -335,6 +335,39 @@ const NewCaseNoteForm: React.FC<NewCaseNoteFormProps> = ({ clientId, onSave, onC
                     dateCreated: Date.now(),
                     read: false
                 });
+            }
+
+            // --- Send Email Notification to Case Manager (Only for NEW notes) ---
+            if (!isEditing) {
+                try {
+                    // Fetch client to get assigned case manager
+                    const client = await api.getClientById(clientId);
+                    if (client && client.metadata.assignedAdminId) {
+                        const assignedAdminFn = staffMembers.find(s => s.uid === client.metadata.assignedAdminId);
+
+                        // Don't email if the author is the assignee (avoid self-spam)
+                        if (assignedAdminFn && assignedAdminFn.uid !== user.uid && assignedAdminFn.email) {
+                            const subject = `New Case Note for ${client.profile.firstName} ${client.profile.lastName}`;
+                            const html = `
+                                <h3>New Case Note Added</h3>
+                                <p><strong>Client:</strong> ${client.profile.firstName} ${client.profile.lastName}</p>
+                                <p><strong>Author:</strong> ${selectedAuthor.name}</p>
+                                <p><strong>Date:</strong> ${noteDate}</p>
+                                <p><strong>Type:</strong> ${noteType}</p>
+                                <p><strong>Subject:</strong> ${subject}</p>
+                                <hr />
+                                <div>${noteBody}</div>
+                                <hr />
+                                <p><small>This is an automated message from the WRTP CMS.</small></p>
+                             `;
+
+                            await api.sendEmail(assignedAdminFn.email, subject, html);
+                        }
+                    }
+                } catch (emailError) {
+                    console.error("Failed to send email notification", emailError);
+                    // Don't block the UI for email failures
+                }
             }
 
             resetForm();
