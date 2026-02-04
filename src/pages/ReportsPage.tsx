@@ -38,6 +38,7 @@ const ReportsPage: React.FC = () => {
     const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>('All');
     const [timeTrackingMonthFilter, setTimeTrackingMonthFilter] = useState<string>('All');
     const [clientTypeFilter, setClientTypeFilter] = useState<string>('All');
+    const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('All');
 
     // AI Insights State
     const [aiQuery, setAiQuery] = useState('');
@@ -410,11 +411,19 @@ const ReportsPage: React.FC = () => {
             return monthKey === timeTrackingMonthFilter;
         };
 
+        const filterByServiceType = (noteType: string) => {
+            if (serviceTypeFilter === 'All') return true;
+            return noteType === serviceTypeFilter;
+        }
+
         // 2. Filter Notes
         const filteredNotes = caseNotes.filter(n => {
             const client = clients.find(c => c.id === n.clientId);
             // Handle case where client might be missing (though unlikely in valid DB)
-            return filterByStaff(n.staffId) && (client ? filterByClientType(client) : clientTypeFilter === 'All') && filterByMonth(n.noteDate);
+            return filterByStaff(n.staffId) &&
+                (client ? filterByClientType(client) : clientTypeFilter === 'All') &&
+                filterByMonth(n.noteDate) &&
+                filterByServiceType(n.serviceType);
         });
 
         // 3. Aggregate Data
@@ -464,7 +473,7 @@ const ReportsPage: React.FC = () => {
             availableMonths,
             noteCount: filteredNotes.length
         };
-    }, [caseNotes, clients, selectedCaseManager, clientTypeFilter, timeTrackingMonthFilter]);
+    }, [caseNotes, clients, selectedCaseManager, clientTypeFilter, timeTrackingMonthFilter, serviceTypeFilter]);
 
 
 
@@ -759,7 +768,6 @@ const ReportsPage: React.FC = () => {
         const rows = timeTrackingData.staffBreakdown.map(s => `
             <tr class="bg-white border-b">
                 <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${s.name}</td>
-                <td class="px-6 py-4 text-center text-gray-700">${s.minutes}</td>
                 <td class="px-6 py-4 text-center text-gray-700">${(s.minutes / 60).toFixed(2)}</td>
                 <td class="px-6 py-4 text-center text-gray-700">${s.noteCount}</td>
             </tr>
@@ -783,6 +791,7 @@ const ReportsPage: React.FC = () => {
                         <p>Staff Filter: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
                         <p>Time Period: <span class="font-semibold text-gray-800">${monthName}</span></p>
                         <p>Client Type: <span class="font-semibold text-gray-800">${clientTypeFilter}</span></p>
+                        <p>Service Type: <span class="font-semibold text-gray-800">${serviceTypeFilter}</span></p>
                     </div>
                 </header>
                 
@@ -792,10 +801,9 @@ const ReportsPage: React.FC = () => {
                             <div class="bg-gray-50 p-6 rounded-lg border">
                                 <p class="text-sm text-gray-500 uppercase tracking-wide">Total Time Spent</p>
                                 <p class="text-4xl font-bold text-[#404E3B] mt-2">${timeTrackingData.totalHours} <span class="text-xl font-normal text-gray-600">Hours</span></p>
-                                <p class="text-sm text-gray-500 mt-1">(${timeTrackingData.totalMinutes} Minutes)</p>
                             </div>
                             <div class="bg-gray-50 p-6 rounded-lg border">
-                                <p class="text-sm text-gray-500 uppercase tracking-wide">Total Case Notes</p>
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Total Encounters</p>
                                 <p class="text-4xl font-bold text-gray-800 mt-2">${timeTrackingData.noteCount}</p>
                             </div>
                         </div>
@@ -805,9 +813,8 @@ const ReportsPage: React.FC = () => {
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">Staff Member</th>
-                                    <th scope="col" class="px-6 py-3 text-center">Minutes</th>
                                     <th scope="col" class="px-6 py-3 text-center">Hours</th>
-                                    <th scope="col" class="px-6 py-3 text-center">Note Count</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Encounters</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1422,6 +1429,23 @@ const ReportsPage: React.FC = () => {
                                     <option value="All">All Types</option>
                                     <option value="General Population">General Population</option>
                                     <option value="CHYBA">CHYBA</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <label htmlFor="serviceTypeFilter" className="text-sm font-medium text-gray-700">Service:</label>
+                                <select
+                                    id="serviceTypeFilter"
+                                    value={serviceTypeFilter}
+                                    onChange={(e) => setServiceTypeFilter(e.target.value)}
+                                    className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B] w-32"
+                                >
+                                    <option value="All">All Services</option>
+                                    <option>Job Search</option>
+                                    <option>Supportive Service</option>
+                                    <option>Training</option>
+                                    <option>Intake Meeting</option>
+                                    <option>ISP Review</option>
+                                    <option>General Check-in</option>
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2">
