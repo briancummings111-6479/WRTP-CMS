@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/firebase';
 import { Client, Workshop, CaseNote } from '../types';
 import Card from '../components/Card';
-import { Printer, Sparkles, Send, Bot, XCircle } from 'lucide-react';
+import { Printer, Sparkles, Send, Bot, XCircle, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,11 +31,13 @@ const ReportsPage: React.FC = () => {
     const [caseNotes, setCaseNotes] = useState<CaseNote[]>([]);
     const [admins, setAdmins] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'population' | 'encounters' | 'barriers' | 'workshopMatrix' | 'workshopAttendance' | 'narrative' | 'aiInsights'>('population');
+    const [activeTab, setActiveTab] = useState<'population' | 'encounters' | 'barriers' | 'workshopMatrix' | 'workshopAttendance' | 'timeTracking' | 'narrative' | 'aiInsights'>('population');
     const [workshopFilter, setWorkshopFilter] = useState('All');
     const [selectedCaseManager, setSelectedCaseManager] = useState('All');
     const [matrixStatusFilter, setMatrixStatusFilter] = useState<string>('All');
     const [encountersMonthFilter, setEncountersMonthFilter] = useState<string>('All');
+    const [timeTrackingMonthFilter, setTimeTrackingMonthFilter] = useState<string>('All');
+    const [clientTypeFilter, setClientTypeFilter] = useState<string>('All');
 
     // AI Insights State
     const [aiQuery, setAiQuery] = useState('');
@@ -389,6 +391,83 @@ const ReportsPage: React.FC = () => {
         return { data, totalActive: activeClients.length };
     }, [filteredClients]);
 
+    const timeTrackingData = useMemo(() => {
+        // 1. Prepare Filters
+        const filterByStaff = (id: string) => {
+            if (selectedCaseManager === 'All') return true;
+            return id === selectedCaseManager;
+        }
+
+        const filterByClientType = (client: Client | undefined) => {
+            if (clientTypeFilter === 'All') return true;
+            return client?.metadata?.clientType === clientTypeFilter;
+        }
+
+        const filterByMonth = (timestamp: number) => {
+            if (timeTrackingMonthFilter === 'All') return true;
+            const date = new Date(timestamp);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            return monthKey === timeTrackingMonthFilter;
+        };
+
+        // 2. Filter Notes
+        const filteredNotes = caseNotes.filter(n => {
+            const client = clients.find(c => c.id === n.clientId);
+            // Handle case where client might be missing (though unlikely in valid DB)
+            return filterByStaff(n.staffId) && (client ? filterByClientType(client) : clientTypeFilter === 'All') && filterByMonth(n.noteDate);
+        });
+
+        // 3. Aggregate Data
+        let totalMinutes = 0;
+        const staffStats: { [key: string]: { name: string, minutes: number, noteCount: number } } = {};
+
+        filteredNotes.forEach(note => {
+            const minutes = note.durationMinutes || 0;
+            totalMinutes += minutes;
+
+            if (!staffStats[note.staffId]) {
+                staffStats[note.staffId] = {
+                    name: note.staffName || 'Unknown Staff',
+                    minutes: 0,
+                    noteCount: 0
+                };
+            }
+            staffStats[note.staffId].minutes += minutes;
+            staffStats[note.staffId].noteCount += 1;
+        });
+
+        // 4. Calculate Available Months (for dropdown)
+        // We scan ALL case notes for this
+        const monthsSet = new Set<string>();
+        caseNotes.forEach(n => {
+            const date = new Date(n.noteDate);
+            monthsSet.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+        });
+        const availableMonths = Array.from(monthsSet)
+            .sort((a, b) => b.localeCompare(a)) // Descending
+            .map(m => {
+                const [y, month] = m.split('-');
+                const date = new Date(parseInt(y), parseInt(month) - 1);
+                return {
+                    value: m,
+                    label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                };
+            });
+
+        // 5. Convert Staff Stats to Array
+        const staffBreakdown = Object.values(staffStats).sort((a, b) => b.minutes - a.minutes);
+
+        return {
+            totalMinutes,
+            totalHours: (totalMinutes / 60).toFixed(2),
+            staffBreakdown,
+            availableMonths,
+            noteCount: filteredNotes.length
+        };
+    }, [caseNotes, clients, selectedCaseManager, clientTypeFilter, timeTrackingMonthFilter]);
+
+
+
 
     const generateClientReportHTML = () => {
         const caseManagerName = selectedCaseManager === 'All'
@@ -668,6 +747,93 @@ const ReportsPage: React.FC = () => {
         }
     };
 
+    const generateTimeTrackingReportHTML = () => {
+        const caseManagerName = selectedCaseManager === 'All'
+            ? 'All Staff'
+            : admins.find(a => a.id === selectedCaseManager)?.name || 'Unknown';
+
+        const monthName = timeTrackingMonthFilter === 'All'
+            ? 'All Time'
+            : timeTrackingData.availableMonths.find(m => m.value === timeTrackingMonthFilter)?.label || timeTrackingMonthFilter;
+
+        const rows = timeTrackingData.staffBreakdown.map(s => `
+            <tr class="bg-white border-b">
+                <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${s.name}</td>
+                <td class="px-6 py-4 text-center text-gray-700">${s.minutes}</td>
+                <td class="px-6 py-4 text-center text-gray-700">${(s.minutes / 60).toFixed(2)}</td>
+                <td class="px-6 py-4 text-center text-gray-700">${s.noteCount}</td>
+            </tr>
+        `).join('');
+
+        return `
+            <html>
+            <head>
+                <title>Case Management Time Report</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>
+                    body { font-family: sans-serif; }
+                    .break-inside-avoid { page-break-inside: avoid; }
+                </style>
+            </head>
+            <body class="p-8 bg-white">
+                <header class="mb-8 border-b pb-4">
+                    <h1 class="text-3xl font-bold text-gray-900">Case Management Time Report</h1>
+                    <div class="mt-2 text-gray-600 space-y-1">
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                        <p>Staff Filter: <span class="font-semibold text-gray-800">${caseManagerName}</span></p>
+                        <p>Time Period: <span class="font-semibold text-gray-800">${monthName}</span></p>
+                        <p>Client Type: <span class="font-semibold text-gray-800">${clientTypeFilter}</span></p>
+                    </div>
+                </header>
+                
+                <main class="space-y-8">
+                    <section class="break-inside-avoid">
+                        <div class="grid grid-cols-2 gap-6 mb-8">
+                            <div class="bg-gray-50 p-6 rounded-lg border">
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Total Time Spent</p>
+                                <p class="text-4xl font-bold text-[#404E3B] mt-2">${timeTrackingData.totalHours} <span class="text-xl font-normal text-gray-600">Hours</span></p>
+                                <p class="text-sm text-gray-500 mt-1">(${timeTrackingData.totalMinutes} Minutes)</p>
+                            </div>
+                            <div class="bg-gray-50 p-6 rounded-lg border">
+                                <p class="text-sm text-gray-500 uppercase tracking-wide">Total Case Notes</p>
+                                <p class="text-4xl font-bold text-gray-800 mt-2">${timeTrackingData.noteCount}</p>
+                            </div>
+                        </div>
+
+                        <h3 className="font-semibold text-gray-800 mb-3 text-lg">Staff Breakdown</h3>
+                        <table class="w-full text-sm text-left text-gray-500 border rounded-lg overflow-hidden">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Staff Member</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Minutes</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Hours</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Note Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </section>
+                </main>
+            </body>
+            </html>
+        `;
+    };
+
+    const handlePrintTimeTrackingReport = () => {
+        const printContent = generateTimeTrackingReportHTML();
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+    };
+
     const generateNarrativeReport = async () => {
         setReportError('');
         setIsGenerating(true);
@@ -853,6 +1019,15 @@ const ReportsPage: React.FC = () => {
                         }`}
                 >
                     Attendance
+                </button>
+                <button
+                    onClick={() => setActiveTab('timeTracking')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'timeTracking'
+                        ? 'bg-white text-[#404E3B] shadow-sm ring-1 ring-black/5'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                        }`}
+                >
+                    Time Tracking
                 </button>
 
                 {/* Admin Only Tabs */}
@@ -1229,7 +1404,109 @@ const ReportsPage: React.FC = () => {
                 </Card>
             )}
 
-            {/* Narrative Report Tab */}
+            {/* Time Tracking Report */}
+            {activeTab === 'timeTracking' && (
+                <Card
+                    title="Case Management Time Tracking"
+                    className="no-print"
+                    titleAction={
+                        <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2">
+                                <label htmlFor="clientTypeFilter" className="text-sm font-medium text-gray-700">Client Type:</label>
+                                <select
+                                    id="clientTypeFilter"
+                                    value={clientTypeFilter}
+                                    onChange={(e) => setClientTypeFilter(e.target.value)}
+                                    className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                                >
+                                    <option value="All">All Types</option>
+                                    <option value="General Population">General Population</option>
+                                    <option value="CHYBA">CHYBA</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <label htmlFor="timeTrackingMonthFilter" className="text-sm font-medium text-gray-700">Month:</label>
+                                <select
+                                    id="timeTrackingMonthFilter"
+                                    value={timeTrackingMonthFilter}
+                                    onChange={(e) => setTimeTrackingMonthFilter(e.target.value)}
+                                    className="p-1 border border-gray-300 rounded-md text-sm bg-white focus:ring-[#404E3B] focus:border-[#404E3B]"
+                                >
+                                    <option value="All">All Months</option>
+                                    {timeTrackingData.availableMonths.map(m => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                onClick={handlePrintTimeTrackingReport}
+                                className="cursor-pointer inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Report
+                            </button>
+                        </div>
+                    }
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 flex flex-col justify-center items-center text-center">
+                            <Clock className="w-8 h-8 text-[#404E3B] mb-2" />
+                            <p className="text-sm text-gray-500 uppercase tracking-wide">Total Time Spent</p>
+                            <p className="text-4xl font-bold text-[#404E3B] mt-2">{timeTrackingData.totalHours} <span className="text-xl font-normal text-gray-600">Hours</span></p>
+                            <p className="text-sm text-gray-500 mt-1">({timeTrackingData.totalMinutes} Minutes)</p>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 flex flex-col justify-center items-center text-center">
+                            <details className="w-full">
+                                <summary className="cursor-pointer list-none flex flex-col items-center">
+                                    <p className="text-sm text-gray-500 uppercase tracking-wide">Total Case Notes Analyzed</p>
+                                    <p className="text-4xl font-bold text-gray-800 mt-2">{timeTrackingData.noteCount}</p>
+                                </summary>
+                            </details>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Breakdown by Staff</h3>
+                        <div className="overflow-x-auto border rounded-lg">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff Member</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Minutes</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Note Count</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {timeTrackingData.staffBreakdown.map((staff) => (
+                                        <tr key={staff.name}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{staff.name}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{staff.minutes}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold text-center">{(staff.minutes / 60).toFixed(2)}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{staff.noteCount}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                                {timeTrackingData.totalMinutes > 0
+                                                    ? ((staff.minutes / timeTrackingData.totalMinutes) * 100).toFixed(1) + '%'
+                                                    : '0%'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {timeTrackingData.staffBreakdown.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                No case note data found for the selected filters.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
+
             {activeTab === 'narrative' && user?.role === 'admin' && (
                 <Card
                     title="Narrative Report Generator"
