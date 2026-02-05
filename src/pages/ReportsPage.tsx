@@ -442,7 +442,9 @@ const ReportsPage: React.FC = () => {
                 };
             }
             staffStats[note.staffId].minutes += minutes;
-            staffStats[note.staffId].noteCount += 1;
+            if (note.noteType === 'Case Note') {
+                staffStats[note.staffId].noteCount += 1;
+            }
         });
 
         // 4. Calculate Available Months (for dropdown)
@@ -471,7 +473,7 @@ const ReportsPage: React.FC = () => {
             totalHours: (totalMinutes / 60).toFixed(2),
             staffBreakdown,
             availableMonths,
-            noteCount: filteredNotes.length
+            noteCount: filteredNotes.filter(n => n.noteType === 'Case Note').length
         };
     }, [caseNotes, clients, selectedCaseManager, clientTypeFilter, timeTrackingMonthFilter, serviceTypeFilter]);
 
@@ -814,7 +816,7 @@ const ReportsPage: React.FC = () => {
                                 <tr>
                                     <th scope="col" class="px-6 py-3">Staff Member</th>
                                     <th scope="col" class="px-6 py-3 text-center">Hours</th>
-                                    <th scope="col" class="px-6 py-3 text-center">Encounters</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Case Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1482,7 +1484,7 @@ const ReportsPage: React.FC = () => {
                         <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 flex flex-col justify-center items-center text-center">
                             <details className="w-full">
                                 <summary className="cursor-pointer list-none flex flex-col items-center">
-                                    <p className="text-sm text-gray-500 uppercase tracking-wide">Total Case Notes Analyzed</p>
+                                    <p className="text-sm text-gray-500 uppercase tracking-wide">Total Case Notes</p>
                                     <p className="text-4xl font-bold text-gray-800 mt-2">{timeTrackingData.noteCount}</p>
                                 </summary>
                             </details>
@@ -1496,9 +1498,8 @@ const ReportsPage: React.FC = () => {
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff Member</th>
-                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Minutes</th>
                                         <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
-                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Note Count</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Case Notes</th>
                                         <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total</th>
                                     </tr>
                                 </thead>
@@ -1506,7 +1507,6 @@ const ReportsPage: React.FC = () => {
                                     {timeTrackingData.staffBreakdown.map((staff) => (
                                         <tr key={staff.name}>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{staff.name}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{staff.minutes}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold text-center">{(staff.minutes / 60).toFixed(2)}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{staff.noteCount}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
