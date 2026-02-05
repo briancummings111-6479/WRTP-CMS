@@ -431,19 +431,22 @@ const ReportsPage: React.FC = () => {
         const staffStats: { [key: string]: { name: string, minutes: number, noteCount: number } } = {};
 
         filteredNotes.forEach(note => {
-            const minutes = note.durationMinutes || 0;
+            const minutes = Number(note.durationMinutes) || 0;
             totalMinutes += minutes;
 
-            if (!staffStats[note.staffId]) {
-                staffStats[note.staffId] = {
-                    name: note.staffName || 'Unknown Staff',
+            // Group by Name to handle duplicate staff accounts
+            const staffKey = (note.staffName || 'Unknown Staff').trim();
+
+            if (!staffStats[staffKey]) {
+                staffStats[staffKey] = {
+                    name: staffKey,
                     minutes: 0,
                     noteCount: 0
                 };
             }
-            staffStats[note.staffId].minutes += minutes;
+            staffStats[staffKey].minutes += minutes;
             if (note.noteType === 'Case Note') {
-                staffStats[note.staffId].noteCount += 1;
+                staffStats[staffKey].noteCount += 1;
             }
         });
 
