@@ -174,7 +174,7 @@ const ClientDashboardPage: React.FC = () => {
   const [isEditingAuditChecklist, setIsEditingAuditChecklist] = useState(false);
   const [isAuditChecklistSaving, setIsAuditChecklistSaving] = useState(false);
 
-  const tabs = ['Case Notes', 'Contact Notes', 'Intake', 'ISP', 'Audit Checklist', 'Training & Employment', 'Files'];
+  const tabs = ['Case Notes', 'Contact Notes', 'Intake', 'ISP', 'Audit Checklist', 'Training & Employment', 'Engagement', 'Files'];
 
   const fetchClientData = async () => {
     if (!clientId) return;

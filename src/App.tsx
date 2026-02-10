@@ -15,6 +15,9 @@ import PendingApprovalPage from './pages/PendingApprovalPage';
 import UsersPage from './pages/UsersPage';
 import ToDoPage from './pages/ToDoPage';
 import JobsDashboard from './pages/JobsDashboard';
+import PartnerDirectory from './components/Engagement/PartnerDirectory';
+import EngagementWizard from './components/Engagement/EngagementWizard';
+import EngagementHistoryPage from './pages/EngagementHistoryPage';
 
 
 // Protected Route Component
@@ -92,6 +95,21 @@ function App() {
           <Route path="/jobs" element={
             <ProtectedRoute>
               <Layout><JobsDashboard /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/partners" element={
+            <ProtectedRoute>
+              <Layout><PartnerDirectory /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engagement/new" element={
+            <ProtectedRoute>
+              <Layout><EngagementWizard /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engagements" element={
+            <ProtectedRoute>
+              <Layout><EngagementHistoryPage /></Layout>
             </ProtectedRoute>
           } />
 

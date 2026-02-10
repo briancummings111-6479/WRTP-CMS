@@ -321,3 +321,75 @@ export interface Notification {
   dateCreated: number;
   read: boolean;
 }
+
+// --- Community & Employer Engagement (CEE) Types ---
+
+export type OrganizationType = 'Employer' | 'Social Service Agency' | 'Training Partner' | 'Other';
+export type OrganizationStatus = 'Prospect' | 'Active Partner' | 'MOU Signed' | 'Inactive';
+
+export interface Organization {
+  id: string;
+  name: string;
+  type: OrganizationType;
+  status: OrganizationStatus;
+  industry?: string;
+  jobOpeningsCount: number;
+  website?: string;
+  phone?: string; // Work Phone
+  cellPhone?: string;
+  email?: string;
+  contactPerson?: string;
+  address?: string; // Single string or structured if needed
+  notes?: string;
+  lastContactDate?: number; // Timestamp
+  createdAt: number; // Timestamp
+  updatedAt: number; // Timestamp
+}
+
+export interface ProfessionalContact {
+  id: string;
+  organizationId: string;
+  organizationName: string; // Denormalized for easier display
+  firstName: string;
+  lastName: string;
+  role: string; // e.g. HR Manager
+  email?: string;
+  phone?: string;
+  isAlumni: boolean;
+  notes?: string;
+}
+
+export type EngagementType = 'Outreach' | 'Case Conference' | 'Presentation' | 'Job Development' | 'Joint Training' | 'Other';
+
+export interface EngagementLog {
+  id: string;
+  date: number; // Timestamp
+  interactionType: EngagementType;
+  organizationId?: string; // Single (Primary)
+  organizationName?: string; // Denormalized
+  organizationIds?: string[]; // Multiple support
+  organizationNames?: string[]; // Denormalized list
+  clientIds?: string[]; // Linked Clients
+  clientNames?: string[]; // Denormalized list
+  professionalContactId?: string; // Optional link to specific person
+  contactName?: string; // Denormalized
+  staffId: string; // Internal staff UID
+  staffName: string; // Internal staff name
+  notes: string; // Rich text or plain text
+  outcome?: string;
+  systemAdvocacyHours?: number; // For 'Presentation' type events
+  durationMinutes?: number; // Duration of the engagement
+  createdAt: number;
+}
+
+export interface GroupSession {
+  id: string;
+  date: number;
+  organizationId?: string; // Partner/Co-host
+  organizationName?: string;
+  topic: string;
+  totalExternalAttendees: number;
+  internalClientIds: string[]; // List of our clients who attended
+  notes?: string;
+  createdBy: string;
+}

@@ -339,7 +339,46 @@ const DataExportPage: React.FC = () => {
   };
 
 
-  const handleExport = async (format: 'JSON' | 'CSV', collection: 'clients' | 'workshops' | 'actionSteps' | 'tasks' | 'caseNotes') => {
+
+
+  const convertISPGoalsToCSV = (isps: (ISP & { clientName: string; clientType: string; caseManager: string; })[]): string => {
+    if (isps.length === 0) return '';
+
+    const flattenedData = isps.map(isp => ({
+      clientId: isp.clientId,
+      clientName: isp.clientName,
+      clientType: isp.clientType,
+      caseManager: isp.caseManager,
+      ispDate: new Date(isp.ispDate).toLocaleDateString(),
+      shortTermGoals: isp.shortTermGoals,
+      longTermGoals: isp.longTermGoals,
+      identifiedBarriers: (isp.identifiedBarriers || []).join('; '),
+      workshopsAssigned: isp.careerPlanning?.workshopsAssigned || '',
+      enrolledInCteOrCollege: isp.careerPlanning?.enrolledInCteOrCollege ? 'Yes' : 'No',
+    }));
+
+    const headers = Object.keys(flattenedData[0]);
+    const headerRow = headers.join(',');
+
+    const rows = flattenedData.map(row => {
+      return headers.map(header => {
+        const val = (row as any)[header];
+        if (val === null || val === undefined) {
+          return '';
+        }
+        const stringVal = String(val);
+        // Clean up newlines for CSV readability in cells
+        if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n')) {
+          return `"${stringVal.replace(/"/g, '""')}"`;
+        }
+        return stringVal;
+      }).join(',');
+    });
+
+    return [headerRow, ...rows].join('\n');
+  };
+
+  const handleExport = async (format: 'JSON' | 'CSV', collection: 'clients' | 'workshops' | 'actionSteps' | 'tasks' | 'caseNotes' | 'ispGoals') => {
     setIsExporting(true);
     try {
       const allClients = await api.getClients();
@@ -496,6 +535,42 @@ const DataExportPage: React.FC = () => {
           const csvString = convertTasksToCSV(filteredTasks);
           downloadFile(csvString, `todos_export_${dateSuffix}.csv`, 'text/csv;charset=utf-8;');
         }
+      } else if (collection === 'ispGoals') {
+        if (filteredClients.length === 0) {
+          alert("No client data found for the selected filters.");
+          return;
+        }
+        const filteredClientIds = new Set(filteredClients.map(c => c.id));
+        // Use the new getAllISPs function
+        const allISPs = await api.getAllISPs();
+
+        const filteredISPs = allISPs.filter(isp => filteredClientIds.has(isp.clientId));
+
+        if (filteredISPs.length === 0) {
+          alert("No ISP data found for the selected client filters.");
+          return;
+        }
+
+        const clientMap = new Map(allClients.map(c => [c.id, {
+          name: `${c.profile.firstName} ${c.profile.lastName}`,
+          type: c.metadata.clientType,
+          caseManager: c.metadata.assignedAdminName,
+        }]));
+
+        const augmentedISPs = filteredISPs.map(isp => ({
+          ...isp,
+          clientName: clientMap.get(isp.clientId)?.name || 'Unknown Client',
+          clientType: clientMap.get(isp.clientId)?.type || 'Unknown',
+          caseManager: clientMap.get(isp.clientId)?.caseManager || 'Unknown',
+        }));
+
+        if (format === 'JSON') {
+          const jsonString = JSON.stringify(augmentedISPs, null, 2);
+          downloadFile(jsonString, `isp_goals_export_${dateSuffix}.json`, 'application/json');
+        } else if (format === 'CSV') {
+          const csvString = convertISPGoalsToCSV(augmentedISPs);
+          downloadFile(csvString, `isp_goals_export_${dateSuffix}.csv`, 'text/csv;charset=utf-8;');
+        }
       }
 
     } catch (error) {
@@ -627,6 +702,20 @@ const DataExportPage: React.FC = () => {
                 {isExporting ? 'Exporting...' : <><DownloadCloud className="h-5 w-5 mr-2 pointer-events-none" /> JSON</>}
               </button>
               <button onClick={() => handleExport('CSV', 'tasks')} disabled={isExporting} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#5a6c53] disabled:bg-gray-300 disabled:cursor-not-allowed">
+                {isExporting ? 'Exporting...' : <><DownloadCloud className="h-5 w-5 mr-2 pointer-events-none" /> CSV</>}
+              </button>
+            </div>
+          </div>
+          <div className="p-4 border rounded-lg flex justify-between items-center bg-white">
+            <div>
+              <h4 className="font-semibold text-gray-800">ISP Goals & Details</h4>
+              <p className="text-sm text-gray-500">Export Short Term/Long Term Goals and Barriers from ISPs.</p>
+            </div>
+            <div className="space-x-2">
+              <button onClick={() => handleExport('JSON', 'ispGoals')} disabled={isExporting} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#404E3B] hover:bg-[#5a6c53] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#5a6c53] disabled:bg-gray-400 disabled:cursor-not-allowed">
+                {isExporting ? 'Exporting...' : <><DownloadCloud className="h-5 w-5 mr-2 pointer-events-none" /> JSON</>}
+              </button>
+              <button onClick={() => handleExport('CSV', 'ispGoals')} disabled={isExporting} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#5a6c53] disabled:bg-gray-300 disabled:cursor-not-allowed">
                 {isExporting ? 'Exporting...' : <><DownloadCloud className="h-5 w-5 mr-2 pointer-events-none" /> CSV</>}
               </button>
             </div>

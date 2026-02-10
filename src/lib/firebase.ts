@@ -276,6 +276,12 @@ const api = {
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as ISP;
   },
 
+  getAllISPs: async (): Promise<ISP[]> => {
+    const q = query(collection(db, "isps"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ISP));
+  },
+
   upsertISP: async (ispData: ISP): Promise<ISP> => {
     const docRef = doc(db, "isps", ispData.id);
     await setDoc(docRef, sanitizeData(ispData));
