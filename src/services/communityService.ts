@@ -104,6 +104,17 @@ export const communityService = {
         return { id: docRef.id, ...newLog };
     },
 
+    async updateEngagement(id: string, data: Partial<EngagementLog>): Promise<void> {
+        const docRef = doc(db, ENGAGEMENTS_COLLECTION, id);
+        await updateDoc(docRef, {
+            ...data
+            // Note: We are NOT updating the organization's lastContactDate automatically here
+            // because it's complex to determine if this specific log was the most recent one.
+            // If strictly needed, we'd have to re-query the org's logs.
+            // For now, we assume this is just a content correction.
+        });
+    },
+
     async getAllEngagements(): Promise<EngagementLog[]> {
         const q = query(collection(db, ENGAGEMENTS_COLLECTION), orderBy("date", "desc"));
         const snapshot = await getDocs(q);

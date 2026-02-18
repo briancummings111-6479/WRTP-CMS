@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { communityService } from '../services/communityService';
 import { EngagementLog, Organization, EngagementType } from '../types';
-import { Search, Filter, Calendar, User, Building2, Download } from 'lucide-react';
+import { Search, Filter, Calendar, User, Building2, Download, Edit2 } from 'lucide-react';
 import api from '../lib/firebase';
+import EditEngagementModal from '../components/Engagement/EditEngagementModal';
 
 const EngagementHistoryPage: React.FC = () => {
     const location = useLocation();
@@ -13,6 +14,7 @@ const EngagementHistoryPage: React.FC = () => {
     const [logs, setLogs] = useState<EngagementLog[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
+    const [editingLog, setEditingLog] = useState<EngagementLog | null>(null);
 
     // Filters
     const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
@@ -215,6 +217,16 @@ const EngagementHistoryPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+                                        {/* Edit Button */}
+                                        <div>
+                                            <button
+                                                onClick={() => setEditingLog(log)}
+                                                className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                title="Edit Engagement"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -227,6 +239,17 @@ const EngagementHistoryPage: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {editingLog && (
+                <EditEngagementModal
+                    isOpen={true}
+                    onClose={() => setEditingLog(null)}
+                    log={editingLog}
+                    onSave={(updatedLog) => {
+                        setLogs(logs.map(lg => lg.id === updatedLog.id ? updatedLog : lg));
+                    }}
+                />
+            )}
         </div>
     );
 };
