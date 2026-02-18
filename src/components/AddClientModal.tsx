@@ -32,8 +32,10 @@ import { toInputDateString } from '../lib/utils';
 // ----------------------------------------
 
 const getInitialFormData = () => ({
+    participantId: '', // Added
     profile: {
         firstName: '',
+        middleInitial: '', // Added
         lastName: '',
         dob: '',
     },
@@ -187,11 +189,15 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                         {/* Profile Section */}
                         <fieldset className="space-y-4 p-4 border border-[#d1d1d1] rounded-md">
                             <legend className="text-lg font-medium text-gray-700 px-1">Profile</legend>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><label className="label">First Name</label><input type="text" name="profile.firstName" value={formData.profile.firstName} onChange={handleInputChange} className="form-input" required /></div>
-                                <div><label className="label">Last Name</label><input type="text" name="profile.lastName" value={formData.profile.lastName} onChange={handleInputChange} className="form-input" required /></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="label">Participant ID</label><input type="text" name="participantId" value={formData.participantId} onChange={handleInputChange} className="form-input" placeholder="Optional" /></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="md:col-span-1"><label className="label">First Name</label><input type="text" name="profile.firstName" value={formData.profile.firstName} onChange={handleInputChange} className="form-input" required /></div>
+                                <div className="md:col-span-1"><label className="label">M.I.</label><input type="text" name="profile.middleInitial" value={formData.profile.middleInitial} onChange={handleInputChange} className="form-input" maxLength={2} /></div>
+                                <div className="md:col-span-1"><label className="label">Last Name</label><input type="text" name="profile.lastName" value={formData.profile.lastName} onChange={handleInputChange} className="form-input" required /></div>
                                 {/* Removed 'required' from DOB */}
-                                <div><label className="label">Date of Birth</label><input type="date" name="profile.dob" value={formData.profile.dob} onChange={handleInputChange} className="form-input" /></div>
+                                <div className="md:col-span-1"><label className="label">Date of Birth</label><input type="date" name="profile.dob" value={formData.profile.dob} onChange={handleInputChange} className="form-input" /></div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div><label className="label">Phone</label><input type="tel" name="contactInfo.phone" value={formData.contactInfo.phone} onChange={handleInputChange} className="form-input" /></div>
@@ -209,7 +215,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onSave
                                 <div><label className="label">Zip Code</label><input type="text" name="contactInfo.zip" value={formData.contactInfo.zip} onChange={handleInputChange} className="form-input" /></div>
                                 <div className="md:col-span-2"><label className="label">Referral Source</label><input type="text" name="referralSource" value={formData.referralSource} onChange={handleInputChange} className="form-input" /></div>
                             </div>
-                            <div><label className="label">Google Drive Link</label><input type="url" name="googleDriveLink" value={formData.googleDriveLink} onChange={handleInputChange} className="form-input" placeholder="httpss://drive.google.com/..." /></div>
+                            <div><label className="label">Google Drive Link</label><input type="url" name="googleDriveLink" value={formData.googleDriveLink} onChange={handleInputChange} className="form-input" placeholder="https://drive.google.com/..." /></div>
                         </fieldset>
 
                         {/* Case Management Section */}

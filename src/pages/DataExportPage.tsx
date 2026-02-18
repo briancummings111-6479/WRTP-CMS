@@ -73,11 +73,12 @@ const DataExportPage: React.FC = () => {
       return {
         id: client.id,
         participantId: client.participantId || '',
-        googleDriveLink: client.googleDriveLink || '',
         'profile.firstName': p.firstName,
         'profile.lastName': p.lastName,
+        'profile.middleInitial': p.middleInitial || '', // Added
         'profile.dob': p.dob || '',
         'profile.age': p.age,
+        googleDriveLink: client.googleDriveLink || '', // Moved to match likely order or just appending
         'contactInfo.phone': c.phone,
         'contactInfo.phone2': c.phone2 || '',
         'contactInfo.email': c.email || '',
